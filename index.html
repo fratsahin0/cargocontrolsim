@@ -6,14 +6,15 @@
     <title>Cargo Control Sim - WEB & MOBILE</title>
     <style>
         /* ================= CSS: UYGULAMANIN MAKYAJI VE TASARIMI ================= */
-        body { background-color: #000000; color: white; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; touch-action: manipulation; }
+        /* 100vh yerine 100dvh kullanıldı. Mobil tarayıcı adres çubuğu sorununu çözer */
+        body { background-color: #000000; color: white; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; touch-action: manipulation; }
 
         /* ================= DİKEY EKRAN (PORTRAIT) ENGELLEYİCİ ================= */
         @media screen and (orientation: portrait) {
             body::before {
                 content: "KAPTAN, LÜTFEN CİHAZINI YAN ÇEVİR! 🔄 \A\A Simülasyon dikey modda çalışmaz.";
                 white-space: pre-wrap;
-                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
                 background-color: #0B132B; color: #00E5FF;
                 display: flex; align-items: center; justify-content: center;
                 font-family: monospace; font-size: 22px; font-weight: bold;
@@ -26,7 +27,7 @@
         }
 
         /* ================= MENÜ EKRANLARI ================= */
-        .screen { display: none; width: 100vw; height: 100vh; background: linear-gradient(to bottom, #0B132B, #000000); flex-direction: column; align-items: center; justify-content: center; overflow-y: auto;}
+        .screen { display: none; width: 100vw; height: 100dvh; background: linear-gradient(to bottom, #0B132B, #000000); flex-direction: column; align-items: center; justify-content: center; overflow-y: auto;}
         .screen.active { display: flex; }
 
         .mm-title { font-size: 38px; font-weight: bold; letter-spacing: 2px; margin-bottom: 10px; text-align: center;}
@@ -54,16 +55,19 @@
         .btn-br-start:hover { background: white; box-shadow: 0 0 15px white;}
 
         /* ================= SİMÜLASYON EKRANI ================= */
-        #sim-container { display: none; width: 100vw; height: 100vh; flex-direction: column; }
-        #main-display { display: flex; flex-grow: 1; padding: 10px; height: calc(100vh - 70px); background-color: #0A0A0A; box-sizing: border-box;}
+        #sim-container { display: none; width: 100vw; height: 100dvh; flex-direction: column; overflow: hidden; }
+        #main-display { display: flex; flex-grow: 1; padding: 10px; height: calc(100dvh - 70px); background-color: #0A0A0A; box-sizing: border-box; overflow: hidden; }
 
-        #left-column { width: 65%; display: flex; flex-direction: column; padding-right: 15px; position: relative; overflow-y: auto;}
+        /* min-height: 0; overflow-y: auto; -> Flexbox içindeki elemanların taşmasını engeller */
+        #left-column { width: 65%; display: flex; flex-direction: column; padding-right: 15px; position: relative; overflow-y: auto; min-height: 0;}
+        #right-column { width: 35%; display: flex; flex-direction: column; border-left: 2px solid #222; padding-left: 15px; min-height: 0; overflow-y: auto;}
+
         .header-title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 5px; color: #E0E0E0;}
         .objective-text { text-align: center; color: #00E5FF; font-style: italic; font-size: 14px; margin-bottom: 5px; }
         
         #alarm-banner { background-color: darkred; color: yellow; text-align: center; padding: 5px; font-weight: bold; font-size: 14px; display: none; margin-bottom: 10px; border-radius: 5px; border: 2px solid red; text-shadow: 1px 1px 2px black;}
 
-        .view-panel { display: none; width: 100%; height: 100%; flex-direction: column; position: relative; }
+        .view-panel { display: none; width: 100%; height: 100%; flex-direction: column; position: relative; overflow-y: auto; overflow-x: hidden; }
         .view-panel.active { display: flex; }
 
         .tank-row { display: flex; height: 50%; width: 100%; justify-content: space-around;}
@@ -134,7 +138,7 @@
         .stab-img { max-height: 280px; max-width: 90%; object-fit: contain; position: absolute; transition: transform 0.2s, bottom 0.2s; z-index: 2;}
         .sea-water { width: 100%; height: 105px; background-color: rgba(0, 102, 204, 0.5); position: absolute; bottom: 0; z-index: 3;}
 
-        #right-column { width: 35%; display: flex; flex-direction: column; border-left: 2px solid #222; padding-left: 15px;}
+        /* ================= SAĞ PANEL ================= */
         .panel-box { background-color: #121212; padding: 15px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #1A1A1A; }
         .val-stability { font-size: 16px; font-weight: bold; color: #00FF00; text-align: center; margin: 4px 0; }
         
@@ -155,12 +159,14 @@
         .btn-complete { background: linear-gradient(#004d00, #001a00); color: white; border: 2px solid #00FF00; padding: 15px 20px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s;}
         .btn-complete:hover { background: #00FF00; box-shadow: 0 0 10px #00FF00; color: black; }
 
-        #bottom-nav { height: 70px; background-color: #050505; border-top: 2px solid #222; display: flex; justify-content: space-around; align-items: center; }
+        /* ================= ALT MENÜ (NAV) ================= */
+        #bottom-nav { height: 70px; background-color: #050505; border-top: 2px solid #222; display: flex; justify-content: space-around; align-items: center; width: 100%; z-index: 100;}
         .nav-btn { background: none; border: none; color: #666; font-size: 16px; font-weight: bold; cursor: pointer; padding: 10px 20px; border-radius: 5px; transition: 0.2s; }
         .nav-btn:hover { color: #FFF; background-color: #1A1A1A; }
         .nav-btn.active { color: #00FF00; background-color: #112211; border: 1px solid #00FF00; box-shadow: 0 0 8px rgba(0, 255, 0, 0.2);}
 
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); z-index: 1000; justify-content: center; align-items: center; }
+        /* ================= MODALLAR & TUTORIAL ================= */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100dvh; background-color: rgba(0,0,0,0.9); z-index: 1000; justify-content: center; align-items: center; }
         .override-box { background-color: #080808; border: 5px solid #FF6600; width: 450px; padding: 25px; font-family: monospace; text-align: center; }
         .override-header { background-color: #FF6600; color: black; font-weight: bold; font-size: 20px; padding: 10px; margin-bottom: 20px; }
         .override-msg { color: #E0E0E0; font-size: 15px; margin-bottom: 30px; line-height: 1.5; }
@@ -172,7 +178,6 @@
         .game-over-header { background-color: red; color: white; animation: flash-red 0.5s infinite; }
         #game-over-reason { color: yellow; font-weight: bold; font-size: 18px; margin-bottom: 20px; }
         
-        /* TUTORIAL TOOLTIP */
         #tut-overlay {
             position: fixed; top: 20px; right: 20px; width: 340px; max-width: 80%;
             background: rgba(0, 25, 45, 0.95); border: 2px solid #00E5FF;
@@ -184,79 +189,76 @@
         .tut-hl { color: #FFD700; font-weight: bold; }
 
 
-        /* ================= MOBİL YATAY (LANDSCAPE) UYUMU ================= */
-        /* Ekran yüksekliği dar olan (telefonu yan tutan) cihazlar için sıkıştırma */
-        @media screen and (max-height: 500px), screen and (max-width: 950px) {
+        /* ================= MOBİL YATAY (LANDSCAPE) DÜZELTMESİ (AGRESİF) ================= */
+        /* Ekran yüksekliği dar veya genişliği az olan mobil cihazlar için özel sıkıştırma kuralları */
+        @media screen and (max-height: 600px), screen and (max-width: 950px) {
             
-            /* Menü Küçültmeleri */
-            .mm-title { font-size: 26px; margin-top: 10px;}
-            .mm-subtitle { margin-bottom: 30px; font-size: 12px;}
-            .btn-mm-start { padding: 12px 25px; font-size: 14px; }
-            .ms-title { font-size: 18px; margin-bottom: 15px; }
-            .ms-row { gap: 10px; margin-bottom: 10px; width: 95%;}
-            .ms-card { padding: 10px; }
-            .ms-card-title { font-size: 12px; margin-bottom: 5px; }
-            .ms-card-type { margin-bottom: 5px; font-size: 10px; }
-            .br-panel { padding: 15px; width: 85%; margin-bottom: 15px; }
-            .br-header { margin-top: 10px; font-size: 14px; }
-            .br-text { font-size: 12px; }
-
-            /* Ana Layout Sıkıştırması */
-            #bottom-nav { height: 50px; }
-            #main-display { height: calc(100vh - 50px); padding: 5px; }
-            #left-column { padding-right: 5px; }
-            #right-column { padding-left: 5px; }
-            .nav-btn { font-size: 10px; padding: 5px 10px; }
+            body { height: 100dvh; }
+            #sim-container { height: 100dvh; }
             
-            /* Sol Kolon (Overview & Tanklar) */
-            .header-title { font-size: 14px; margin-bottom: 2px; margin-top: 5px !important; }
-            .objective-text { font-size: 11px; margin-bottom: 2px; }
-            #alarm-banner { font-size: 11px; padding: 3px; margin-bottom: 5px; }
-            .tank-box { padding: 4px; margin: 2px; }
-            .tank-name { font-size: 11px; margin-bottom: 2px; }
-            .tank-info { font-size: 9px; margin-top: 1px; }
-            .val-ullage { font-size: 10px; }
-            .val-vol { font-size: 10px; }
+            /* ALT MENÜ (Hiçbir yere gitmemesi için sabitlendi ve ufaltıldı) */
+            #bottom-nav { height: 45px; min-height: 45px;}
+            .nav-btn { font-size: 10px; padding: 5px 10px; border-radius: 3px;}
 
-            /* Sağ Kolon (Paneller & Aksiyonlar) */
-            .panel-box { padding: 8px; margin-bottom: 5px; }
-            .val-stability { font-size: 12px; margin: 2px 0; }
-            .ship-visuals { height: 80px; margin-top: 5px; }
-            .mini-img { max-height: 60px; }
-            .dial-box { margin: 8px 0; }
-            .dial-val { font-size: 18px; padding: 5px; }
+            /* ANA EKRAN KAPSAYICISI (Menü yüksekliği düşülerek hesaplandı) */
+            #main-display { height: calc(100dvh - 45px); padding: 5px; }
+            
+            /* SOL KOLON (Tanklar, P&ID) */
+            #left-column { width: 68%; padding-right: 5px; }
+            .header-title { font-size: 13px; margin-bottom: 2px; margin-top: 2px !important; }
+            .objective-text { font-size: 10px; margin-bottom: 2px; }
+            #alarm-banner { font-size: 10px; padding: 2px; margin-bottom: 3px; }
+            
+            .tank-row { height: 48%; }
+            .tank-box { padding: 2px; margin: 2px; border-radius: 3px;}
+            .tank-name { font-size: 10px; margin-bottom: 1px; }
+            .val-temp { font-size: 8px !important; }
+            .tank-frame { margin-bottom: 2px; min-height: 30px;}
+            .tank-info { font-size: 9px; margin-top: 1px; line-height: 1.1; }
+            .val-ullage { font-size: 9px; }
+            .val-vol, .val-rate, .val-press { font-size: 9px; }
+
+            /* SAĞ KOLON (Taşmayı engelleyen agresif küçültme) */
+            #right-column { width: 32%; padding-left: 5px; }
+            .panel-box { padding: 6px; margin-bottom: 5px; border-radius: 4px; }
+            .val-stability { font-size: 11px !important; margin: 2px 0 !important; }
+            
+            .ship-visuals { height: 55px; margin-top: 5px; }
+            .mini-img { max-height: 45px; }
+            .mini-sea { height: 15px; }
+            
+            .dial-box { margin: 5px 0; }
             .dial-box div:first-child { font-size: 10px; margin-bottom: 2px; }
-            .rob-val { font-size: 14px; }
-            .btn-complete, .btn-abort { padding: 8px 10px; font-size: 10px; border-radius: 4px; }
+            .dial-val { font-size: 16px !important; padding: 4px !important; border-width: 1px !important; }
+            
             #tv-draft-fwd, #tv-draft-aft { font-size: 14px !important; }
             
-            /* Stability Ekranı */
+            .action-row { margin-top: auto; }
+            .rob-val { font-size: 12px; }
+            .btn-complete, .btn-abort { padding: 6px; font-size: 8px; border-radius: 4px; line-height: 1.2;}
+            
+            /* STABILITY EKRANI */
             .stab-box { padding-top: 5px; }
             .stab-title { font-size: 12px; }
             .stab-val { font-size: 14px; margin-bottom: 5px; }
             #big-val-bm, #big-val-sf { font-size: 18px !important; margin-top: 10px !important; }
-            .stab-img { max-height: 120px; }
-            .sea-water { height: 40px; }
+            .stab-img { max-height: 100px; }
+            .sea-water { height: 30px; }
 
+            /* TUTORIAL KUTUSU (Devasa kutuyu mobil boyutuna indirdik) */
+            #tut-overlay { width: 220px; padding: 8px; top: 5px; right: 5px; background: rgba(0, 25, 45, 0.85);}
+            .tut-title { font-size: 11px; margin-bottom: 3px; padding-bottom: 2px;}
+            .tut-msg { font-size: 10px; line-height: 1.2; }
+
+            /* P&ID ZOOM KÜÇÜLTMELERİ */
+            #mimic-board-zoom-wrapper { zoom: 0.55; }
+            #view-ballast > div:nth-child(4) { zoom: 0.60; transform-origin: top left;}
+            
             /* Modallar */
-            .override-box { width: 90%; max-width: 350px; padding: 15px; }
-            .override-header { font-size: 16px; margin-bottom: 10px; padding: 5px; }
-            .override-msg { font-size: 12px; margin-bottom: 15px; }
-            .btn-return, .btn-execute { padding: 10px; font-size: 12px; }
-
-            /* *** CARGO MIMIC PANELI MOBIL UYUMU (ZOOMLAMA TEKNIGI) *** */
-            /* P&ID panelleri fixed pixel olduğundan bozmamak için zoom ile küçültüyoruz */
-            #mimic-board-zoom-wrapper { zoom: 0.65; transform-origin: top center; }
-            
-            /* *** BALLAST REMOTE PANELI MOBIL UYUMU *** */
-            #view-ballast > div:nth-child(4) { zoom: 0.7; transform-origin: top left; }
-            
-            /* Buton ve slider düzeltmeleri */
-            .btn-toggle { padding: 5px 2px; font-size: 9px; margin: 2px; }
-            .slider { height: 10px; }
-            #tut-overlay { padding: 10px; top: 10px; right: 10px; width: 280px; }
-            .tut-title { font-size: 13px; margin-bottom: 5px; }
-            .tut-msg { font-size: 12px; }
+            .override-box { width: 90%; max-width: 320px; padding: 15px; }
+            .override-header { font-size: 14px; margin-bottom: 10px; padding: 5px; }
+            .override-msg { font-size: 11px; margin-bottom: 15px; }
+            .btn-return, .btn-execute { padding: 8px; font-size: 11px; }
         }
 
     </style>
