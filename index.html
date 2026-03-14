@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Cargo Control Sim - WEB & MOBILE</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         /* ================= CSS: UYGULAMANIN MAKYAJI VE TASARIMI ================= */
-        /* 100vh yerine 100dvh kullanıldı. Mobil tarayıcı adres çubuğu sorununu çözer */
-        body { background-color: #000000; color: white; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; touch-action: manipulation; }
+        body { background-color: #000000; color: white; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100dvh; overflow: hidden; touch-action: manipulation; transition: background-color 0.3s, color 0.3s; }
 
-        /* ================= DİKEY EKRAN (PORTRAIT) ENGELLEYİCİ ================= */
         @media screen and (orientation: portrait) {
             body::before {
                 content: "KAPTAN, LÜTFEN CİHAZINI YAN ÇEVİR! 🔄 \A\A Simülasyon dikey modda çalışmaz.";
@@ -21,13 +22,19 @@
                 text-align: center; z-index: 999999; padding: 20px; box-sizing: border-box;
                 border: 10px solid #000;
             }
-            #sim-container, #screen-main-menu, #screen-mission-select, #screen-briefing, .modal-overlay, #tut-overlay {
-                display: none !important;
-            }
+            #sim-container, #screen-main-menu, #screen-mission-select, #screen-briefing, .modal-overlay, #tut-overlay { display: none !important; }
         }
 
+        /* TEXT COLOR CLASSES FOR DYNAMIC THEME SWITCHING */
+        .text-safe { color: #00FF00 !important; }
+        .text-warn { color: #FFB300 !important; }
+        .text-danger { color: #FF4444 !important; }
+        
+        .pv-closed { color: gray; font-weight: bold; }
+        .pv-open { color: #FFA500; font-weight: bold; }
+
         /* ================= MENÜ EKRANLARI ================= */
-        .screen { display: none; width: 100vw; height: 100dvh; background: linear-gradient(to bottom, #0B132B, #000000); flex-direction: column; align-items: center; justify-content: center; overflow-y: auto;}
+        .screen { display: none; width: 100vw; height: 100dvh; background: linear-gradient(to bottom, #0B132B, #000000); flex-direction: column; align-items: center; justify-content: center; overflow-y: auto; transition: background 0.3s;}
         .screen.active { display: flex; }
 
         .mm-title { font-size: 38px; font-weight: bold; letter-spacing: 2px; margin-bottom: 10px; text-align: center;}
@@ -36,14 +43,12 @@
         .btn-mm-start:hover { background: #00E5FF; color: black; box-shadow: 0 0 15px #00E5FF; }
 
         .ms-title { font-size: 24px; color: #00E5FF; font-family: monospace; font-weight: bold; margin-bottom: 30px; margin-top: 20px;}
-        
         .ms-row { display: flex; width: 85%; max-width: 1000px; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
         .ms-card { flex: 1; background: #111827; border: 3px solid #374151; border-radius: 20px; padding: 20px; text-align: center; cursor: pointer; transition: 0.2s; }
         .ms-card:hover { border-width: 4px; transform: scale(1.02); }
         .ms-card-type { font-size: 12px; color: gray; font-family: monospace; font-weight: bold; margin-bottom: 15px;}
         .ms-card-title { font-size: 16px; font-weight: bold; margin-bottom: 15px; white-space: pre-line; line-height: 1.4; }
         .ms-card-status { font-size: 12px; font-family: monospace; font-style: italic; }
-        
         .status-ready { color: #00FF00; }
         .btn-ms-back { margin-top: 20px; margin-bottom: 20px; font-size: 14px; color: gray; font-weight: bold; cursor: pointer; transition: 0.2s;}
         .btn-ms-back:hover { color: white; }
@@ -56,24 +61,42 @@
 
         /* ================= SİMÜLASYON EKRANI ================= */
         #sim-container { display: none; width: 100vw; height: 100dvh; flex-direction: column; overflow: hidden; }
-        #main-display { display: flex; flex-grow: 1; padding: 10px; height: calc(100dvh - 70px); background-color: #0A0A0A; box-sizing: border-box; overflow: hidden; }
+        #main-display { display: flex; flex-grow: 1; padding: 10px; height: calc(100dvh - 70px); background-color: #0A0A0A; box-sizing: border-box; overflow: hidden; transition: background-color 0.3s; }
 
-        /* min-height: 0; overflow-y: auto; -> Flexbox içindeki elemanların taşmasını engeller */
         #left-column { width: 65%; display: flex; flex-direction: column; padding-right: 15px; position: relative; overflow-y: auto; min-height: 0;}
         #right-column { width: 35%; display: flex; flex-direction: column; border-left: 2px solid #222; padding-left: 15px; min-height: 0; overflow-y: auto;}
 
         .header-title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 5px; color: #E0E0E0;}
         .objective-text { text-align: center; color: #00E5FF; font-style: italic; font-size: 14px; margin-bottom: 5px; }
         
+        /* EMERGENCY ESTOP BANNER */
+        .estop-active { background-color: red !important; color: white !important; font-size: 16px !important; text-shadow: none !important; animation: flash-red 0.5s infinite; }
         #alarm-banner { background-color: darkred; color: yellow; text-align: center; padding: 5px; font-weight: bold; font-size: 14px; display: none; margin-bottom: 10px; border-radius: 5px; border: 2px solid red; text-shadow: 1px 1px 2px black;}
 
         .view-panel { display: none; width: 100%; height: 100%; flex-direction: column; position: relative; overflow-y: auto; overflow-x: hidden; }
         .view-panel.active { display: flex; }
+        
+        .theme-box { background-color: #111; border: 1px solid #333; }
+        .theme-box-border { border: 1px solid #00E5FF; }
 
         .tank-row { display: flex; height: 50%; width: 100%; justify-content: space-around;}
         .tank-box { flex: 1; display: flex; flex-direction: column; align-items: center; margin: 4px; background-color: #161616; padding: 10px; border-radius: 5px; border: 1px solid #222;}
-        .tank-name { font-weight: bold; margin-bottom: 5px; color: #CCC; display: flex; align-items: center; justify-content: center; gap: 5px;}
+        .tank-name { font-weight: bold; margin-bottom: 5px; color: #CCC; display: flex; align-items: center; justify-content: center; gap: 5px; width: 100%;}
         
+        /* CARGO SELECT DROPDOWN */
+        .tank-cargo-select {
+            background-color: #222;
+            color: #FFF;
+            border: 1px solid #555;
+            border-radius: 3px;
+            font-size: 10px;
+            font-family: monospace;
+            padding: 1px 2px;
+            cursor: pointer;
+            outline: none;
+            max-width: 65px;
+        }
+
         .tank-frame { width: 85%; flex-grow: 1; border: 2px solid #555; display: flex; flex-direction: column; justify-content: flex-end; background-color: #050505; margin-bottom: 5px; position: relative; box-shadow: inset 0 0 15px rgba(0,0,0,1); overflow: hidden; transition: 0.2s; min-height: 50px;}
 
         @keyframes flash-orange { 0% { box-shadow: inset 0 0 20px #FF8C00; border-color: #FF8C00; } 50% { box-shadow: inset 0 0 0px black; border-color: #555; } 100% { box-shadow: inset 0 0 20px #FF8C00; border-color: #FF8C00; } }
@@ -83,7 +106,7 @@
         .alarm-hhl { animation: flash-red 0.5s infinite; }
         .alarm-overfill { background-color: rgba(255,0,0,0.3) !important; box-shadow: inset 0 0 50px red !important; border-color: red; }
 
-        .liquid { width: 100%; transition: height 0.2s; position: absolute; bottom: 0; z-index: 2; background: linear-gradient(to right, #660033 0%, #FF1493 50%, #660033 100%); box-shadow: inset 0px 5px 15px rgba(0,0,0,0.4); border-top: 3px solid #FF99CC; }
+        .liquid { width: 100%; transition: height 0.2s, background 0.5s, border-top-color 0.5s; position: absolute; bottom: 0; z-index: 2; box-shadow: inset 0px 5px 15px rgba(0,0,0,0.4); }
         .liquid-ballast { background: linear-gradient(to right, #002244 0%, #0088FF 50%, #002244 100%); border-top: 3px solid #66B2FF; }
 
         .tank-markers { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
@@ -91,6 +114,7 @@
 
         .tank-info { font-size: 11px; text-align: center; margin-top: 3px; line-height: 1.2;}
         .val-vol { font-weight: bold; color: #FFF; }
+        .val-mt { font-weight: bold; color: #FFD700; font-size: 10px; }
         .val-ullage { font-weight: bold; color: #FFD700; font-size: 12px; margin-top: 1px;} 
         .val-temp { color: #FF8C00; font-weight: bold; }
         .val-rate { color: #00FF00; }
@@ -104,10 +128,10 @@
         .slider { width: 90%; margin: 10px 0; cursor: pointer;}
         .val-speed { color: yellow; font-weight: bold; font-size: 13px; }
 
-        /* ================= CARGO SYSTEM ================= */
+        /* ================= CARGO SYSTEM & DYNAMIC FLOW ================= */
         .m-label { font-size: 10px; color: #AAA; font-family: monospace; font-weight: bold; pointer-events: none; }
         .m-tank { width: 55px; height: 55px; border: 2px solid #FF99CC; background: #220011; display: flex; align-items: center; justify-content: center; color: #FF99CC; font-weight: bold; font-size: 18px; border-radius: 6px; box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 0 8px rgba(255,153,204,0.3); }
-        .m-pump { width: 30px; height: 30px; border-radius: 50%; border: 3px solid #555; background-color: #222; color: #777; font-size: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 0 5px rgba(0,0,0,0.8); }
+        .m-pump { width: 30px; height: 30px; border-radius: 50%; border: 3px solid #555; background-color: #222; color: #777; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 0 5px rgba(0,0,0,0.8); z-index: 10;}
         .m-pump.on { border-color: #00FF00; background-color: #004400; color: #00FF00; box-shadow: 0 0 15px #00FF00; }
         
         .m-valve { width: 26px; height: 26px; border-radius: 50%; border: 3px solid #CC0000; background-color: #440000; position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; z-index: 10; box-shadow: 0 0 5px rgba(0,0,0,0.8); }
@@ -115,15 +139,55 @@
         .m-valve.on { border-color: #00FF00; background-color: #004400; box-shadow: 0 0 10px #00FF00; }
         .m-valve.on::after { background-color: #00FF00; transform: rotate(90deg); }
 
-        /* ================= BALLAST REMOTE PANEL ================= */
-        .pid-pipe { position: absolute; background-color: #555; z-index: 1; }
+        /* --- DYNAMIC FLOW & PUMP ANIMATIONS --- */
+        .pipe-empty { background: #555 !important; animation: none !important; box-shadow: none !important; }
+        .pipe-filled-b { background: #004466 !important; animation: none !important; box-shadow: inset 0 0 4px #00FFFF !important; }
+
+        @keyframes liquid-flow-right { from { background-position: 0 0, 0 0; } to { background-position: 20px 0, 30px 0; } }
+        @keyframes liquid-flow-left { from { background-position: 0 0, 0 0; } to { background-position: -20px 0, -30px 0; } }
+        @keyframes liquid-flow-down { from { background-position: 0 0, 0 0; } to { background-position: 0 20px, 0 30px; } }
+        @keyframes liquid-flow-up { from { background-position: 0 0, 0 0; } to { background-position: 0 -20px, 0 -30px; } }
         
+        @keyframes pump-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .pump-spinning { animation: pump-spin var(--pump-anim-speed, 1s) linear infinite; }
+
+        /* CARGO FLOWS (Parallax Bubble Effect) */
+        .flow-c-right { background-color: #4A0024 !important; background-image: radial-gradient(circle at 50% 50%, rgba(255, 20, 147, 0.9) 2px, transparent 3px), radial-gradient(circle at 20% 80%, rgba(255, 105, 180, 0.9) 1.5px, transparent 2px) !important; background-size: 10px 10px, 15px 15px !important; box-shadow: inset 0 0 4px rgba(0,0,0,0.8) !important; animation: liquid-flow-right 0.6s linear infinite !important; }
+        .flow-c-left { background-color: #4A0024 !important; background-image: radial-gradient(circle at 50% 50%, rgba(255, 20, 147, 0.9) 2px, transparent 3px), radial-gradient(circle at 20% 80%, rgba(255, 105, 180, 0.9) 1.5px, transparent 2px) !important; background-size: 10px 10px, 15px 15px !important; box-shadow: inset 0 0 4px rgba(0,0,0,0.8) !important; animation: liquid-flow-left 0.6s linear infinite !important; }
+        .flow-c-down { background-color: #4A0024 !important; background-image: radial-gradient(circle at 50% 50%, rgba(255, 20, 147, 0.9) 2px, transparent 3px), radial-gradient(circle at 20% 80%, rgba(255, 105, 180, 0.9) 1.5px, transparent 2px) !important; background-size: 10px 10px, 15px 15px !important; box-shadow: inset 0 0 4px rgba(0,0,0,0.8) !important; animation: liquid-flow-down 0.6s linear infinite !important; }
+        .flow-c-up { background-color: #4A0024 !important; background-image: radial-gradient(circle at 50% 50%, rgba(255, 20, 147, 0.9) 2px, transparent 3px), radial-gradient(circle at 20% 80%, rgba(255, 105, 180, 0.9) 1.5px, transparent 2px) !important; background-size: 10px 10px, 15px 15px !important; box-shadow: inset 0 0 4px rgba(0,0,0,0.8) !important; animation: liquid-flow-up 0.6s linear infinite !important; }
+
+        /* BALLAST FLOWS (Parallax Bubble Effect) */
+        .flow-b-right { background-color: #002244 !important; background-image: radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.8) 2px, transparent 3px), radial-gradient(circle at 20% 80%, rgba(0, 150, 255, 0.9) 1.5px, transparent 2px) !important; background-size: 10px 10px, 15px 15px !important; box-shadow: inset 0 0 4px rgba(0,0,0,0.8) !important; animation: liquid-flow-right 0.6s linear infinite !important; }
+        .flow-b-left { background-color: #002244 !important; background-image: radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.8) 2px, transparent 3px), radial-gradient(circle at 20% 80%, rgba(0, 150, 255, 0.9) 1.5px, transparent 2px) !important; background-size: 10px 10px, 15px 15px !important; box-shadow: inset 0 0 4px rgba(0,0,0,0.8) !important; animation: liquid-flow-left 0.6s linear infinite !important; }
+        .flow-b-down { background-color: #002244 !important; background-image: radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.8) 2px, transparent 3px), radial-gradient(circle at 20% 80%, rgba(0, 150, 255, 0.9) 1.5px, transparent 2px) !important; background-size: 10px 10px, 15px 15px !important; box-shadow: inset 0 0 4px rgba(0,0,0,0.8) !important; animation: liquid-flow-down 0.6s linear infinite !important; }
+        .flow-b-up { background-color: #002244 !important; background-image: radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.8) 2px, transparent 3px), radial-gradient(circle at 20% 80%, rgba(0, 150, 255, 0.9) 1.5px, transparent 2px) !important; background-size: 10px 10px, 15px 15px !important; box-shadow: inset 0 0 4px rgba(0,0,0,0.8) !important; animation: liquid-flow-up 0.6s linear infinite !important; }
+
+        /* ================= BALLAST REMOTE PANEL ================= */
+        .pid-pipe { position: absolute; background-color: #555; z-index: 1; transition: background 0.2s;}
+        
+        .pid-label {
+            position: absolute;
+            font-family: monospace;
+            font-size: 12px;
+            font-weight: bold;
+            color: #00E5FF;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 2px 4px;
+            border-radius: 4px;
+            z-index: 15;
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            pointer-events: none;
+            text-shadow: none;
+            transform: translate(-50%, -50%);
+        }
+
         .pid-valve { width: 30px; height: 30px; border-radius: 50%; border: 3px solid #CC0000; background-color: #330000; position: absolute; transform: translate(-50%, -50%); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; z-index: 10; box-shadow: 0 0 8px rgba(0,0,0,0.8); }
         .pid-valve::after { content: ''; width: 4px; height: 18px; background-color: #CC0000; transition: 0.2s; }
         .pid-valve.on { border-color: #00FF00; background-color: #003300; box-shadow: 0 0 12px #00FF00; }
         .pid-valve.on::after { background-color: #00FF00; transform: rotate(90deg); }
         
-        .pid-pump { width: 45px; height: 45px; border-radius: 50%; border: 4px solid #777; background-color: #222; position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; z-index: 5; font-weight: bold; font-size: 14px; color: #888; box-shadow: 0 0 10px black;}
+        .pid-pump { width: 45px; height: 45px; border-radius: 50%; border: 4px solid #777; background-color: #222; position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; z-index: 5; font-weight: bold; font-size: 24px; color: #888; box-shadow: 0 0 10px black;}
         .pid-pump.on { border-color: #00E5FF; background-color: #004466; color: white; box-shadow: 0 0 20px #00E5FF; }
 
         .pid-text { position: absolute; font-family: monospace; font-size: 12px; font-weight: bold; color: #CCC; pointer-events: none; text-shadow: 1px 1px 2px black;}
@@ -131,6 +195,7 @@
         /* ================= STABILITY EKRANI ================= */
         .stab-visual-area { display: flex; height: 100%; flex-wrap: wrap; align-items: center; justify-content: space-around;}
         .stab-box { flex-basis: 45%; display: flex; flex-direction: column; align-items: center; background-color: #111; border: 1px solid #333; height: 45%; margin: 5px; position: relative; overflow: hidden; padding-top: 15px;}
+        .chart-box { flex-basis: 92%; display: flex; flex-direction: column; align-items: center; background-color: #111; border: 1px solid #333; height: 45%; margin: 5px; padding: 10px;}
         
         .stab-title { color: cyan; font-size: 16px; font-weight: bold; margin: 0; z-index: 5;}
         .stab-val { color: #00FF00; font-size: 20px; font-weight: bold; margin-top: 5px; margin-bottom: 20px; z-index: 5; text-align: center;}
@@ -138,9 +203,26 @@
         .stab-img { max-height: 280px; max-width: 90%; object-fit: contain; position: absolute; transition: transform 0.2s, bottom 0.2s; z-index: 2;}
         .sea-water { width: 100%; height: 105px; background-color: rgba(0, 102, 204, 0.5); position: absolute; bottom: 0; z-index: 3;}
 
+        /* ================= LOADICATOR EKRANI ================= */
+        .loadicator-layout { display: flex; width: 100%; height: 100%; padding: 10px; box-sizing: border-box; gap: 15px; }
+        .loadicator-panel { background: #111; border: 1px solid #333; padding: 15px; border-radius: 8px; flex: 1; overflow-y: auto; display: flex; flex-direction: column;}
+        .loadicator-title { color: cyan; text-align: center; font-size: 16px; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .input-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-family: monospace; }
+        .input-row label { font-size: 14px; color: #DDD; }
+        .input-row input { width: 80px; padding: 5px; background: #222; border: 1px solid #555; color: white; text-align: right; border-radius: 4px; font-family: monospace;}
+        
+        .checklist-item { display: flex; align-items: center; justify-content: space-between; background: #222; padding: 8px; margin-bottom: 5px; border-radius: 4px; border-left: 3px solid #555; transition: 0.2s;}
+        .checklist-item.done { border-left-color: #00FF00; opacity: 0.6; text-decoration: line-through; }
+        .checklist-item button.btn-check { background: none; border: 1px solid #555; color: white; cursor: pointer; padding: 5px; border-radius: 3px; font-size: 12px; transition: 0.2s;}
+        .checklist-item.done button.btn-check { background: #00FF00; color: black; border-color: #00FF00; }
+        .checklist-item button.btn-del { background: none; border: none; color: #FF4444; cursor: pointer; font-size: 14px; }
+        
+        .loadicator-res-box { display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; background: #1A1E24; padding: 12px; border-radius: 8px; border: 1px solid #444; box-shadow: inset 0 0 10px rgba(0,0,0,0.5);}
+        .loadicator-res-box div { font-family: monospace; font-size: 16px; color: #00E5FF; font-weight: bold; text-shadow: 1px 1px 2px #000; }
+
         /* ================= SAĞ PANEL ================= */
-        .panel-box { background-color: #121212; padding: 15px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #1A1A1A; }
-        .val-stability { font-size: 16px; font-weight: bold; color: #00FF00; text-align: center; margin: 4px 0; }
+        .panel-box { background-color: #121212; padding: 15px; margin-bottom: 10px; border-radius: 5px; border: 1px solid #1A1A1A; transition: background-color 0.3s; }
+        .val-stability { font-size: 16px; font-weight: bold; text-align: center; margin: 4px 0; }
         
         .ship-visuals { display: flex; justify-content: space-around; margin-top: 15px; position: relative; height: 120px; overflow: hidden; background-color: #050505; border-radius: 5px;}
         .ship-img-container { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; height: 100%; }
@@ -151,19 +233,98 @@
         .dial-val { font-family: monospace; font-size: 32px; font-weight: bold; background-color: #0A0A0A; padding: 10px; border: 2px solid #333; border-radius: 8px; display: inline-block; box-shadow: inset 0 0 10px #000;}
         
         .action-row { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
-        .rob-val { font-size: 22px; font-weight: bold; color: #00E5FF; }
+        .rob-val { font-size: 14px; font-weight: bold; color: #00E5FF; line-height: 1.3;}
         
-        .btn-abort { background: linear-gradient(#8B0000, #330000); color: white; border: 2px solid #FF0000; padding: 15px 20px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; margin-left: 10px;}
+        .btn-abort { background: linear-gradient(#8B0000, #330000); color: white; border: 2px solid #FF0000; padding: 15px 20px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s;}
         .btn-abort:hover { background: #FF0000; box-shadow: 0 0 10px #FF0000; }
 
         .btn-complete { background: linear-gradient(#004d00, #001a00); color: white; border: 2px solid #00FF00; padding: 15px 20px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s;}
         .btn-complete:hover { background: #00FF00; box-shadow: 0 0 10px #00FF00; color: black; }
 
+        .btn-estop { background: linear-gradient(#CC7700, #884400); color: white; border: 2px solid #FFA500; padding: 15px 20px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .btn-estop:hover { background: #FFA500; box-shadow: 0 0 10px #FFA500; color: black; }
+
+        /* YENİ BUZZER STOP BUTONU */
+        .btn-buzzer { background: linear-gradient(#444, #222); color: white; border: 2px solid #888; padding: 15px 20px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .btn-buzzer:hover { background: #666; box-shadow: 0 0 10px #FFF; color: white; }
+        .btn-buzzer:active { background: #00E5FF; color: black; }
+
         /* ================= ALT MENÜ (NAV) ================= */
-        #bottom-nav { height: 70px; background-color: #050505; border-top: 2px solid #222; display: flex; justify-content: space-around; align-items: center; width: 100%; z-index: 100;}
+        #bottom-nav { height: 70px; background-color: #050505; border-top: 2px solid #222; display: flex; justify-content: space-around; align-items: center; width: 100%; z-index: 100; transition: background-color 0.3s;}
         .nav-btn { background: none; border: none; color: #666; font-size: 16px; font-weight: bold; cursor: pointer; padding: 10px 20px; border-radius: 5px; transition: 0.2s; }
         .nav-btn:hover { color: #FFF; background-color: #1A1A1A; }
         .nav-btn.active { color: #00FF00; background-color: #112211; border: 1px solid #00FF00; box-shadow: 0 0 8px rgba(0, 255, 0, 0.2);}
+
+        /* ================= AÇIK TEMA (LIGHT THEME) OVERRIDES ================= */
+        body.light-theme { background-color: #EFEBE0; color: #2B261C; }
+        body.light-theme .tank-cargo-select { background-color: #FFF; color: #111; border-color: #C4BCA8; }
+        body.light-theme .screen { background: linear-gradient(to bottom, #EFEBE0, #DCD7C9); }
+        body.light-theme .mm-title, body.light-theme .ms-title, body.light-theme #br-main-title { color: #2B261C; text-shadow: none; }
+        body.light-theme .mm-subtitle { color: #0055cc; }
+        body.light-theme .btn-mm-start { background: #fff; color: #111; border-color: #0055cc; }
+        body.light-theme .btn-mm-start:hover { background: #0055cc; color: white; box-shadow: 0 0 15px #0055cc; }
+        body.light-theme .ms-card { background: #F8F5EE; border-color: #D6CFC1 !important; color: #111; }
+        body.light-theme .ms-card:hover { border-color: #0055cc !important; }
+        body.light-theme .btn-ms-back { color: #555; }
+        body.light-theme .btn-ms-back:hover { color: #111; }
+        body.light-theme .br-panel { background: #F8F5EE; border-color: #D6CFC1; }
+        body.light-theme .br-text { color: #332D22; }
+        
+        body.light-theme #main-display { background-color: #E6E2D6; border-color: #D6CFC1; }
+        body.light-theme .panel-box, body.light-theme .stab-box, body.light-theme .chart-box, body.light-theme .tank-box, body.light-theme .loadicator-panel, body.light-theme .theme-box { background-color: #F8F5EE !important; border-color: #D6CFC1 !important; }
+        body.light-theme .theme-box-border { border-color: #D6CFC1 !important; }
+        body.light-theme #left-column { border-color: #D6CFC1; }
+        body.light-theme #right-column { border-left-color: #D6CFC1; }
+        body.light-theme .header-title, body.light-theme .loadicator-title { color: #2B261C !important; border-bottom-color: #D6CFC1;}
+        body.light-theme .objective-text { color: #0055CC !important; }
+        body.light-theme .tank-name { color: #111; }
+        body.light-theme .val-vol { color: #111; }
+        body.light-theme .val-mt { color: #885500; }
+        body.light-theme .val-press { color: #0055CC !important; }
+        body.light-theme .val-rate { color: #008800; }
+        body.light-theme .val-temp { color: #A65D00 !important; }
+        body.light-theme .tank-frame { background-color: #EFEBE0; border-color: #C4BCA8; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); }
+        body.light-theme .marker-line { color: rgba(0,0,0,0.6); border-bottom-color: rgba(0,0,0,0.15); text-shadow: none; }
+        body.light-theme .dial-val { background-color: #F8F5EE; color: #111 !important; border-color: #D6CFC1; box-shadow: inset 0 0 5px #D6CFC1; }
+        body.light-theme #tv-mani-press { color: #A65D00 !important; }
+        body.light-theme .ship-visuals { background-color: #EFEBE0; border-color: #C4BCA8; }
+        body.light-theme #bottom-nav { background-color: #EFEBE0; border-top-color: #D6CFC1; }
+        body.light-theme .nav-btn { color: #555; }
+        body.light-theme .nav-btn:hover { background-color: #DCD7C9; color: #111; }
+        body.light-theme .nav-btn.active { background-color: #F8F5EE; color: #008800; border-color: #008800; box-shadow: 0 0 8px rgba(0,200,0,0.2); }
+        
+        body.light-theme #mimic-board { background-color: #F8F5EE !important; border-color: #D6CFC1 !important; }
+        body.light-theme #ballast-pid-board { background-color: #F8F5EE !important; border-color: #D6CFC1 !important; }
+        body.light-theme .m-label { color: #4A4233; }
+        body.light-theme .m-tank { background: #ffe6f2; border-color: #ff3399; color: #cc0066; box-shadow: none; }
+        body.light-theme .pipe-empty { background-color: #D6CFC1 !important; }
+        body.light-theme #mimic-main-vert-pipe + .m-label { background-color: #F8F5EE; color: #cc7700; border: 1px solid #D6CFC1; text-shadow: none; }
+        body.light-theme .pid-text { color: #2B261C !important; text-shadow: none !important; }
+        body.light-theme .pid-pump { background-color: #EFEBE0; border-color: #C4BCA8; color: #555; box-shadow: none; }
+        body.light-theme .pid-pump.on { background-color: #e0f7fa; border-color: #00acc1; color: #00838f; }
+        body.light-theme .pid-valve { background-color: #fce4e4; box-shadow: none; }
+        body.light-theme .pid-valve.on { background-color: #e8f5e9; }
+        body.light-theme .m-pump { background-color: #EFEBE0; border-color: #C4BCA8; box-shadow: none;}
+        body.light-theme .m-valve { background-color: #fce4e4; box-shadow: none;}
+        body.light-theme .rob-val { color: #0055cc !important; }
+        body.light-theme .pid-label { color: #0055CC; background: rgba(255, 255, 255, 0.85); border: 1px solid #AABBDD; }
+        
+        body.light-theme .input-row label { color: #332D22; }
+        body.light-theme .input-row input { background: #FFF !important; border-color: #C4BCA8 !important; color: #111 !important; }
+        body.light-theme .checklist-item { background: #EFEBE0 !important; border-left-color: #C4BCA8 !important; color: #111 !important; border: 1px solid #D6CFC1; border-left-width: 3px; }
+        body.light-theme .checklist-item.done { border-left-color: #008800 !important; }
+        body.light-theme .checklist-item button.btn-check { border-color: #C4BCA8 !important; color: #555 !important; }
+        body.light-theme .checklist-item.done button.btn-check { background: #008800 !important; color: white !important; border-color: #008800 !important; }
+        body.light-theme #note-input { background: #FFF !important; border-color: #C4BCA8 !important; color: #111 !important; }
+        body.light-theme .loadicator-res-box { background: #EFEBE0 !important; border-color: #D6CFC1 !important; }
+        body.light-theme .loadicator-res-box div { color: #0055CC !important; }
+        
+        body.light-theme .text-safe { color: #008800 !important; }
+        body.light-theme .text-warn { color: #CC7700 !important; }
+        body.light-theme .text-danger { color: #CC0000 !important; }
+        body.light-theme .pv-closed { color: #666; font-weight: bold; }
+        body.light-theme .pv-open { color: #CC7700; font-weight: bold; }
+        body.light-theme #cargo-density-display { color: #A65D00 !important; }
 
         /* ================= MODALLAR & TUTORIAL ================= */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100dvh; background-color: rgba(0,0,0,0.9); z-index: 1000; justify-content: center; align-items: center; }
@@ -178,92 +339,71 @@
         .game-over-header { background-color: red; color: white; animation: flash-red 0.5s infinite; }
         #game-over-reason { color: yellow; font-weight: bold; font-size: 18px; margin-bottom: 20px; }
         
-        #tut-overlay {
-            position: fixed; top: 20px; right: 20px; width: 340px; max-width: 80%;
-            background: rgba(0, 25, 45, 0.95); border: 2px solid #00E5FF;
-            padding: 15px; border-radius: 8px; z-index: 9999;
-            box-shadow: 0 0 20px rgba(0,229,255,0.6); display: none;
-        }
+        #tut-overlay { position: fixed; top: 20px; right: 20px; width: 340px; max-width: 80%; background: rgba(0, 25, 45, 0.95); border: 2px solid #00E5FF; padding: 15px; border-radius: 8px; z-index: 9999; box-shadow: 0 0 20px rgba(0,229,255,0.6); display: none; }
         .tut-title { color: #00E5FF; font-family: monospace; font-weight: bold; margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #00E5FF; padding-bottom: 5px;}
         .tut-msg { color: #E0E0E0; font-size: 15px; line-height: 1.5; }
         .tut-hl { color: #FFD700; font-weight: bold; }
 
-
-        /* ================= MOBİL YATAY (LANDSCAPE) DÜZELTMESİ (AGRESİF) ================= */
-        /* Ekran yüksekliği dar veya genişliği az olan mobil cihazlar için özel sıkıştırma kuralları */
+        /* ================= MOBİL YATAY DÜZELTMESİ ================= */
         @media screen and (max-height: 600px), screen and (max-width: 950px) {
-            
-            body { height: 100dvh; }
-            #sim-container { height: 100dvh; }
-            
-            /* ALT MENÜ (Hiçbir yere gitmemesi için sabitlendi ve ufaltıldı) */
+            body, #sim-container { height: 100dvh; }
             #bottom-nav { height: 45px; min-height: 45px;}
             .nav-btn { font-size: 10px; padding: 5px 10px; border-radius: 3px;}
-
-            /* ANA EKRAN KAPSAYICISI (Menü yüksekliği düşülerek hesaplandı) */
             #main-display { height: calc(100dvh - 45px); padding: 5px; }
-            
-            /* SOL KOLON (Tanklar, P&ID) */
             #left-column { width: 68%; padding-right: 5px; }
             .header-title { font-size: 13px; margin-bottom: 2px; margin-top: 2px !important; }
             .objective-text { font-size: 10px; margin-bottom: 2px; }
             #alarm-banner { font-size: 10px; padding: 2px; margin-bottom: 3px; }
-            
             .tank-row { height: 48%; }
             .tank-box { padding: 2px; margin: 2px; border-radius: 3px;}
-            .tank-name { font-size: 10px; margin-bottom: 1px; }
+            .tank-name { font-size: 10px; margin-bottom: 1px; flex-wrap: wrap; }
+            .tank-cargo-select { font-size: 8px; margin-left: 2px; }
             .val-temp { font-size: 8px !important; }
             .tank-frame { margin-bottom: 2px; min-height: 30px;}
             .tank-info { font-size: 9px; margin-top: 1px; line-height: 1.1; }
-            .val-ullage { font-size: 9px; }
-            .val-vol, .val-rate, .val-press { font-size: 9px; }
-
-            /* SAĞ KOLON (Taşmayı engelleyen agresif küçültme) */
+            .val-ullage, .val-vol, .val-mt, .val-rate, .val-press { font-size: 9px; }
             #right-column { width: 32%; padding-left: 5px; }
             .panel-box { padding: 6px; margin-bottom: 5px; border-radius: 4px; }
             .val-stability { font-size: 11px !important; margin: 2px 0 !important; }
-            
             .ship-visuals { height: 55px; margin-top: 5px; }
             .mini-img { max-height: 45px; }
             .mini-sea { height: 15px; }
-            
             .dial-box { margin: 5px 0; }
             .dial-box div:first-child { font-size: 10px; margin-bottom: 2px; }
             .dial-val { font-size: 16px !important; padding: 4px !important; border-width: 1px !important; }
-            
             #tv-draft-fwd, #tv-draft-aft { font-size: 14px !important; }
-            
             .action-row { margin-top: auto; }
-            .rob-val { font-size: 12px; }
-            .btn-complete, .btn-abort { padding: 6px; font-size: 8px; border-radius: 4px; line-height: 1.2;}
-            
-            /* STABILITY EKRANI */
+            .rob-val { font-size: 11px; }
+            /* BUTONLAR BURADA DÜZENLENDİ */
+            .btn-complete, .btn-abort, .btn-estop, .btn-buzzer { padding: 6px; font-size: 8px; border-radius: 4px; line-height: 1.2; margin-left: 2px; margin-right: 2px; }
             .stab-box { padding-top: 5px; }
             .stab-title { font-size: 12px; }
             .stab-val { font-size: 14px; margin-bottom: 5px; }
-            #big-val-bm, #big-val-sf { font-size: 18px !important; margin-top: 10px !important; }
             .stab-img { max-height: 100px; }
             .sea-water { height: 30px; }
-
-            /* TUTORIAL KUTUSU (Devasa kutuyu mobil boyutuna indirdik) */
             #tut-overlay { width: 220px; padding: 8px; top: 5px; right: 5px; background: rgba(0, 25, 45, 0.85);}
             .tut-title { font-size: 11px; margin-bottom: 3px; padding-bottom: 2px;}
             .tut-msg { font-size: 10px; line-height: 1.2; }
-
-            /* P&ID ZOOM KÜÇÜLTMELERİ */
             #mimic-board-zoom-wrapper { zoom: 0.55; }
             #view-ballast > div:nth-child(4) { zoom: 0.60; transform-origin: top left;}
-            
-            /* Modallar */
             .override-box { width: 90%; max-width: 320px; padding: 15px; }
             .override-header { font-size: 14px; margin-bottom: 10px; padding: 5px; }
             .override-msg { font-size: 11px; margin-bottom: 15px; }
             .btn-return, .btn-execute { padding: 8px; font-size: 11px; }
+            
+            .loadicator-layout { flex-direction: column; overflow-y: auto; height: auto; }
+            .loadicator-panel { flex: none; height: auto; margin-bottom: 10px; }
         }
-
     </style>
 </head>
 <body>
+
+    <audio id="audio-hl" loop preload="auto">
+        <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+    </audio>
+    <audio id="audio-hhl" loop preload="auto">
+        <source src="https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg" type="audio/ogg">
+    </audio>
 
     <div id="tut-overlay">
         <div id="tut-title" class="tut-title"></div>
@@ -280,17 +420,17 @@
         <div class="ms-title">SELECT OPERATION</div>
         
         <div class="ms-row">
-            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#FFB300'" onmouseout="this.style.borderColor='#374151'" onclick="openBriefing(5)">
+            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#FFB300'" onmouseout="if(!document.body.classList.contains('light-theme')) this.style.borderColor='#374151'" onclick="openBriefing(5)">
                 <div class="ms-card-type">TRAINING</div>
                 <div class="ms-card-title" style="color:#FFB300">LOADING<br>TUTORIAL</div>
                 <div class="ms-card-status status-ready">Status: Ready</div>
             </div>
-            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#FF4444'" onmouseout="this.style.borderColor='#374151'" onclick="openBriefing(2)">
+            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#FF4444'" onmouseout="if(!document.body.classList.contains('light-theme')) this.style.borderColor='#374151'" onclick="openBriefing(2)">
                 <div class="ms-card-type">MISSION 2</div>
                 <div class="ms-card-title" style="color:#FF4444">LOADING<br>OPERATION</div>
                 <div class="ms-card-status status-ready">Status: Ready</div>
             </div>
-            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#00FF00'" onmouseout="this.style.borderColor='#374151'" onclick="openBriefing(4)">
+            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#00FF00'" onmouseout="if(!document.body.classList.contains('light-theme')) this.style.borderColor='#374151'" onclick="openBriefing(4)">
                 <div class="ms-card-type">RANDOM</div>
                 <div class="ms-card-title" style="color:#00FF00">DYNAMIC<br>LOAD</div>
                 <div class="ms-card-status status-ready">Status: Ready</div>
@@ -298,17 +438,17 @@
         </div>
 
         <div class="ms-row">
-            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#FFB300'" onmouseout="this.style.borderColor='#374151'" onclick="openBriefing(6)">
+            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#FFB300'" onmouseout="if(!document.body.classList.contains('light-theme')) this.style.borderColor='#374151'" onclick="openBriefing(6)">
                 <div class="ms-card-type">TRAINING</div>
                 <div class="ms-card-title" style="color:#FFB300">DISCHARGING<br>TUTORIAL</div>
                 <div class="ms-card-status status-ready">Status: Ready</div>
             </div>
-            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#FF4444'" onmouseout="this.style.borderColor='#374151'" onclick="openBriefing(1)">
+            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#FF4444'" onmouseout="if(!document.body.classList.contains('light-theme')) this.style.borderColor='#374151'" onclick="openBriefing(1)">
                 <div class="ms-card-type">MISSION 1</div>
                 <div class="ms-card-title" style="color:#FF4444">DISCHARGING<br>OPERATION</div>
                 <div class="ms-card-status status-ready">Status: Ready</div>
             </div>
-            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#00FF00'" onmouseout="this.style.borderColor='#374151'" onclick="openBriefing(3)">
+            <div class="ms-card" style="border-color: #374151;" onmouseover="this.style.borderColor='#00FF00'" onmouseout="if(!document.body.classList.contains('light-theme')) this.style.borderColor='#374151'" onclick="openBriefing(3)">
                 <div class="ms-card-type">RANDOM</div>
                 <div class="ms-card-title" style="color:#00FF00">DYNAMIC<br>DISCHARGE</div>
                 <div class="ms-card-status status-ready">Status: Ready</div>
@@ -325,7 +465,7 @@
             <div class="br-text" id="br-constraints-text">
                 </div>
             <div class="br-header" style="color: #FF3D00;">CRITICAL ALARMS</div>
-            <div class="br-text">• 95% : High Level Alarm (Warning)<br>• 98% : High-High Level Alarm (Critical)<br>• 100%: Overfill (Mission Failed!)<br>• >100% BM/SF: Hull Breach (Mission Failed!)</div>
+            <div class="br-text">• 95% : High Level Alarm (Warning)<br>• 98% : High-High Level Alarm (Critical)<br>• 100%: Overfill (Mission Failed!)<br>• >100% BM/SF: Hull Breach (Mission Failed!)<br>• <b style="color: cyan;">NEGATIVE GM: Vessel Capsized (Mission Failed!)</b><br>• <b>EMERGENCY STOP</b> Button: Shuts all pumps and manifold instantly</div>
         </div>
         <button class="btn-br-start" onclick="startSimulation()">ACKNOWLEDGE & START</button>
         <div class="btn-ms-back" onclick="navigate('screen-mission-select')">◀ GO BACK</div>
@@ -344,18 +484,19 @@
                 </div>
 
                 <div id="view-cargo" class="view-panel">
-                    <div id="mimic-board" style="display:flex; flex-direction:column; width:100%; height:100%; overflow-y:auto; overflow-x:hidden; background-color:#0A0A0A; border: 2px solid #222; border-radius:8px; position:relative; padding-bottom: 20px;">
+                    <div id="mimic-board" class="theme-box" style="display:flex; flex-direction:column; width:100%; height:100%; overflow-y:auto; overflow-x:hidden; border-radius:8px; position:relative; padding-bottom: 20px;">
                         
                         <div id="mimic-board-zoom-wrapper" style="width: 100%;">
                             <div style="position:relative; width:100%; height:70px; min-height:70px;">
-                                <div style="position:absolute; top:40px; left:10%; right:10%; height:6px; background:#555; z-index:1;"></div>
-                                <div class="m-valve" id="mimic-mani-val" style="position:absolute; top:30px; left:50%; transform:translateX(-50%); z-index:2;"></div>
+                                <div id="mimic-mani-pipe" style="position:absolute; top:40px; left:10%; right:10%; height:8px; border-radius:4px; background:#555; z-index:1; transition: 0.3s;"></div>
+                                <div class="m-valve" id="mimic-mani-val" style="position:absolute; top:31px; left:50%; transform:translateX(-50%); z-index:2;"></div>
                                 <div class="m-label" style="position:absolute; top:10px; left:50%; transform:translateX(-50%); color:#FF5555; font-size: 14px; letter-spacing: 2px;">COMMON MANIFOLD</div>
                                 <div class="m-label" style="position:absolute; top:50px; right:10%; color:#777;">TO SHORE ➡</div>
                             </div>
 
-                            <div style="position:absolute; left:50%; top:40px; bottom:20px; width:12px; background:#555; transform:translateX(-50%); z-index:1; display:flex; align-items:center; justify-content:center;">
-                                <div class="m-label" style="background-color:#0A0A0A; padding: 10px 15px; color:#FF9900; font-size:16px; letter-spacing: 3px; white-space:nowrap; z-index: 5;">COLLECTOR LINE</div>
+                            <div style="position:absolute; left:50%; top:40px; bottom:20px; width:12px; transform:translateX(-50%); z-index:1; display:flex; align-items:center; justify-content:center;">
+                                <div id="mimic-main-vert-pipe" style="width:100%; height:100%; border-radius:4px; background:#555; transition: 0.3s;"></div>
+                                <div class="m-label" style="position:absolute; padding: 10px 15px; color:#FF9900; font-size:16px; letter-spacing: 3px; white-space:nowrap; z-index: 5;">COLLECTOR LINE</div>
                             </div>
                             
                             <div id="mimic-rows-container" style="display:flex; flex-direction:column; width:100%; padding-top:20px;"></div>
@@ -369,62 +510,105 @@
                     <div class="tank-row" style="height: 35%;" id="bl-row-all"></div>
                     
                     <div class="header-title" style="margin-top: 5px; color: cyan;">BALLAST REMOTE PANEL</div>
-                    <div style="display: flex; width: 100%; height: 60%; background-color: #050505; border: 2px solid #333; border-radius: 8px; position: relative; overflow: hidden;">
+                    <div id="ballast-pid-board" class="theme-box" style="display: flex; width: 100%; height: 60%; border-radius: 8px; position: relative; overflow: hidden;">
                         
-                        <div class="pid-pipe" style="left: 5%; top: 50%; width: 10%; height: 4px;"></div> <div class="pid-pipe" style="left: 15%; top: 25%; width: 4px; height: 50%;"></div> <div class="pid-pipe" style="left: 15%; top: 25%; width: 60%; height: 4px;"></div> <div class="pid-pipe" style="left: 15%; top: 75%; width: 60%; height: 4px;"></div> <div class="pid-pipe" style="left: 65%; top: 25%; width: 4px; height: 50%;"></div> 
+                        <div id="p-sea-1" class="pid-pipe" style="left: 5%; top: 50%; width: 5%; height: 4px;"></div> 
+                        <div id="p-sea-2" class="pid-pipe" style="left: 10%; top: 50%; width: 5%; height: 4px;"></div> 
                         
-                        <div class="pid-pipe" style="left: 75%; top: 25%; width: 5%; height: 4px;"></div>
-                        <div class="pid-pipe" style="left: 75%; top: 75%; width: 5%; height: 4px;"></div>
+                        <div id="p-sea-vert-p" class="pid-pipe" style="left: 15%; top: 25%; width: 4px; height: 25%;"></div>
+                        <div id="p-sea-vert-s" class="pid-pipe" style="left: 15%; top: 50%; width: 4px; height: 25%;"></div>
+                        
+                        <div id="p-m-p1" class="pid-pipe" style="left: 15%; top: 25%; width: 7%; height: 4px;"></div>
+                        <div id="p-m-p2" class="pid-pipe" style="left: 22%; top: 25%; width: 6%; height: 4px;"></div>
+                        <div id="p-m-p3" class="pid-pipe" style="left: 28%; top: 25%; width: 7%; height: 4px;"></div>
+                        <div id="p-m-p4" class="pid-pipe" style="left: 35%; top: 25%; width: 13%; height: 4px;"></div>
+                        <div id="p-m-p5" class="pid-pipe" style="left: 48%; top: 25%; width: 3.5%; height: 4px;"></div>
+                        <div id="p-m-p6" class="pid-pipe" style="left: 51.5%; top: 25%; width: 3.5%; height: 4px;"></div>
+                        <div id="p-m-p7" class="pid-pipe" style="left: 55%; top: 25%; width: 20%; height: 4px;"></div>
+                        <div id="p-tank-p" class="pid-pipe" style="left: 75%; top: 25%; width: 5%; height: 4px;"></div>
 
-                        <div class="pid-pipe" style="left: 28%; top: 25%; width: 4px; height: 15%;"></div> <div class="pid-pipe" style="left: 28%; top: 40%; width: 27%; height: 4px;"></div> <div class="pid-pipe" style="left: 55%; top: 25%; width: 4px; height: 15%;"></div> <div class="pid-pipe" style="left: 28%; top: 60%; width: 4px; height: 15%;"></div> <div class="pid-pipe" style="left: 28%; top: 60%; width: 27%; height: 4px;"></div> <div class="pid-pipe" style="left: 55%; top: 60%; width: 4px; height: 15%;"></div> <div class="pid-pipe" style="left: 48%; top: 4%; width: 4px; height: 21%;"></div> <div class="pid-pipe" style="left: 48%; top: 75%; width: 4px; height: 21%;"></div> <div style="position: absolute; left: 5%; top: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; border: 3px solid white; display: flex; align-items: center; justify-content: center; background: #111; z-index: 2;">
+                        <div id="p-bp-up-p" class="pid-pipe" style="left: 28%; top: 25%; width: 4px; height: 15%;"></div>
+                        <div id="p-bp-p1" class="pid-pipe" style="left: 28%; top: 40%; width: 13%; height: 4px;"></div>
+                        <div id="p-bp-p2" class="pid-pipe" style="left: 41%; top: 40%; width: 14%; height: 4px;"></div>
+                        <div id="p-bp-dn-p" class="pid-pipe" style="left: 55%; top: 25%; width: 4px; height: 15%;"></div>
+
+                        <div id="p-ovb-p1" class="pid-pipe" style="left: 48%; top: 15%; width: 4px; height: 10%;"></div> 
+                        <div id="p-ovb-p2" class="pid-pipe" style="left: 48%; top: 4%; width: 4px; height: 11%;"></div> 
+
+                        <div id="p-m-s1" class="pid-pipe" style="left: 15%; top: 75%; width: 7%; height: 4px;"></div>
+                        <div id="p-m-s2" class="pid-pipe" style="left: 22%; top: 75%; width: 6%; height: 4px;"></div>
+                        <div id="p-m-s3" class="pid-pipe" style="left: 28%; top: 75%; width: 7%; height: 4px;"></div>
+                        <div id="p-m-s4" class="pid-pipe" style="left: 35%; top: 75%; width: 13%; height: 4px;"></div>
+                        <div id="p-m-s5" class="pid-pipe" style="left: 48%; top: 75%; width: 3.5%; height: 4px;"></div>
+                        <div id="p-m-s6" class="pid-pipe" style="left: 51.5%; top: 75%; width: 3.5%; height: 4px;"></div>
+                        <div id="p-m-s7" class="pid-pipe" style="left: 55%; top: 75%; width: 20%; height: 4px;"></div>
+                        <div id="p-tank-s" class="pid-pipe" style="left: 75%; top: 75%; width: 5%; height: 4px;"></div>
+
+                        <div id="p-bp-dn-s" class="pid-pipe" style="left: 28%; top: 60%; width: 4px; height: 15%;"></div>
+                        <div id="p-bp-s1" class="pid-pipe" style="left: 28%; top: 60%; width: 13%; height: 4px;"></div>
+                        <div id="p-bp-s2" class="pid-pipe" style="left: 41%; top: 60%; width: 14%; height: 4px;"></div>
+                        <div id="p-bp-up-s" class="pid-pipe" style="left: 55%; top: 60%; width: 4px; height: 15%;"></div>
+                        
+                        <div id="p-ovb-s1" class="pid-pipe" style="left: 48%; top: 75%; width: 4px; height: 10%;"></div> 
+                        <div id="p-ovb-s2" class="pid-pipe" style="left: 48%; top: 85%; width: 4px; height: 11%;"></div> 
+
+                        <div id="p-cross-tie" class="pid-pipe" style="left: 65%; top: 25%; width: 4px; height: 50%;"></div>
+
+                        <div style="position: absolute; left: 5%; top: 50%; transform: translate(-50%, -50%); width: 60px; height: 60px; border: 3px solid white; display: flex; align-items: center; justify-content: center; background: #111; z-index: 2;">
                             <div style="width: 30px; height: 30px; border-radius: 50%; border: 2px solid white;"></div>
                         </div>
                         <div class="pid-text" style="left: 5%; top: 62%; transform: translateX(-50%);">SEA CHEST</div>
                         
-                        <div class="pid-text" style="left: 10%; top: 38%; transform: translateX(-50%); color: #00E5FF;">V1</div>
+                        <div class="pid-label" style="left: 10%; top: 43%;">V1</div>
                         <div class="pid-valve" id="v1" style="left: 10%; top: 50%;"></div>
 
-                        <div class="pid-text" style="left: 22%; top: 13%; transform: translateX(-50%); color: #00E5FF;">V2</div>
+                        <div class="pid-label" style="left: 22%; top: 18%;">V2</div>
                         <div class="pid-valve" id="v2" style="left: 22%; top: 25%;"></div>
                         
-                        <div class="pid-text" style="left: 22%; top: 87%; transform: translateX(-50%); color: #00E5FF;">V6</div>
+                        <div class="pid-label" style="left: 22%; top: 68%;">V6</div>
                         <div class="pid-valve" id="v6" style="left: 22%; top: 75%;"></div>
 
-                        <div class="pid-text" style="left: 41%; top: 28%; transform: translateX(-50%); color: #00E5FF;">V3</div>
+                        <div class="pid-label" style="left: 41%; top: 33%;">V3</div>
                         <div class="pid-valve" id="v3" style="left: 41%; top: 40%;"></div>
                         
-                        <div class="pid-text" style="left: 41%; top: 72%; transform: translateX(-50%); color: #00E5FF;">V7</div>
+                        <div class="pid-label" style="left: 41%; top: 53%;">V7</div>
                         <div class="pid-valve" id="v7" style="left: 41%; top: 60%;"></div>
 
-                        <div class="pid-text" style="left: 65%; top: 38%; transform: translateX(-50%); color: #00E5FF;">V5</div>
+                        <div class="pid-label" style="left: 65%; top: 43%;">V5</div>
                         <div class="pid-valve" id="v5" style="left: 65%; top: 50%; transform: translate(-50%, -50%) rotate(90deg);"></div>
 
-                        <div class="pid-pump" id="pP" style="left: 35%; top: 25%;">P</div>
+                        <div class="pid-label" style="left: 51.5%; top: 18%;">V9</div>
+                        <div class="pid-valve" id="v9" style="left: 51.5%; top: 25%;"></div>
+
+                        <div class="pid-label" style="left: 51.5%; top: 68%;">V10</div>
+                        <div class="pid-valve" id="v10" style="left: 51.5%; top: 75%;"></div>
+
+                        <div class="pid-pump" id="pP" style="left: 35%; top: 25%;">✺</div>
                         <div class="pid-text" style="left: 32%; top: 15%; color: cyan;">Port Pump</div>
                         <input type="range" id="sb-bp-port" class="slider" min="0" max="100" value="0" style="position: absolute; left: 30%; top: 32%; width: 10%;">
                         <div id="tv-bp-port-spd" class="pid-text" style="left: 35%; top: 37%; transform: translateX(-50%); color: yellow;">0%</div>
 
-                        <div class="pid-pump" id="pS" style="left: 35%; top: 75%;">S</div>
+                        <div class="pid-pump" id="pS" style="left: 35%; top: 75%;">✺</div>
                         <div class="pid-text" style="left: 32%; top: 65%; color: cyan;">Starboard Pump</div>
                         <input type="range" id="sb-bp-stbd" class="slider" min="0" max="100" value="0" style="position: absolute; left: 30%; top: 82%; width: 10%;">
                         <div id="tv-bp-stbd-spd" class="pid-text" style="left: 35%; top: 87%; transform: translateX(-50%); color: yellow;">0%</div>
 
                         <div style="position: absolute; left: 48%; top: 4%; transform: translate(-50%, -50%); width: 40px; height: 20px; border: 2px solid white; background-color:#111; z-index: 2;"></div>
                         <div class="pid-text" style="left: 52%; top: 2%;">OVERBOARD</div>
-                        <div class="pid-text" style="left: 48%; top: 27%; transform: translateX(-50%); color: #00E5FF;">V4</div>
+                        <div class="pid-label" style="left: 43%; top: 15%;">V4</div>
                         <div class="pid-valve" id="v4" style="left: 48%; top: 15%; transform: translate(-50%, -50%) rotate(90deg);"></div>
 
                         <div style="position: absolute; left: 48%; top: 96%; transform: translate(-50%, -50%); width: 40px; height: 20px; border: 2px solid white; background-color:#111; z-index: 2;"></div>
                         <div class="pid-text" style="left: 52%; top: 93%;">OVERBOARD</div>
-                        <div class="pid-text" style="left: 48%; top: 73%; transform: translateX(-50%); color: #00E5FF;">V8</div>
+                        <div class="pid-label" style="left: 43%; top: 85%;">V8</div>
                         <div class="pid-valve" id="v8" style="left: 48%; top: 85%; transform: translate(-50%, -50%) rotate(90deg);"></div>
 
-                        <div style="position: absolute; left: 80%; top: 5%; width: 18%; height: 40%; background: #111; border: 2px solid #444; padding: 5px; display: flex; flex-direction: column; align-items: center; overflow-y: auto;">
+                        <div class="theme-box" style="position: absolute; left: 80%; top: 5%; width: 18%; height: 40%; padding: 5px; display: flex; flex-direction: column; align-items: center; overflow-y: auto;">
                             <div class="pid-text" style="position: relative; top: 0; left: 0; transform: none; margin-bottom: 5px; color: cyan;">PORT TANKS</div>
                             <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;" id="bl-valves-port"></div>
                         </div>
 
-                        <div style="position: absolute; left: 80%; top: 50%; width: 18%; height: 40%; background: #111; border: 2px solid #444; padding: 5px; display: flex; flex-direction: column; align-items: center; overflow-y: auto;">
+                        <div class="theme-box" style="position: absolute; left: 80%; top: 50%; width: 18%; height: 40%; padding: 5px; display: flex; flex-direction: column; align-items: center; overflow-y: auto;">
                             <div class="pid-text" style="position: relative; top: 0; left: 0; transform: none; margin-bottom: 5px; color: cyan;">STARBOARD TANKS</div>
                             <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;" id="bl-valves-stbd"></div>
                         </div>
@@ -435,26 +619,97 @@
                 <div id="view-stability" class="view-panel">
                     <div class="header-title" style="margin-top:10px;">DETAILED STABILITY & STRESS VISUALIZATION</div>
                     <div class="stab-visual-area">
-                        <div class="stab-box">
+                        <div class="stab-box theme-box" style="flex-basis: 45%;">
                             <h3 class="stab-title">TRIM</h3>
-                            <div class="stab-val" id="big-val-trim">0.00 m</div>
+                            <div class="stab-val text-safe" id="big-val-trim">0.00 m</div>
                             <img src="assets/side.png" id="img-stab-side" class="stab-img" onerror="this.src='side.png'">
                             <div class="sea-water"></div>
                         </div>
-                        <div class="stab-box">
+                        <div class="stab-box theme-box" style="flex-basis: 45%;">
                             <h3 class="stab-title">LIST</h3>
-                            <div class="stab-val" id="big-val-list">0.00 deg</div>
+                            <div class="stab-val text-safe" id="big-val-list">0.00 deg</div>
                             <img src="assets/back.png" id="img-stab-back" class="stab-img" onerror="this.src='back.png'">
                             <div class="sea-water"></div>
                         </div>
-                        <div class="stab-box">
-                            <h3 class="stab-title">BENDING MOMENT</h3>
-                            <div class="stab-val" id="big-val-bm" style="color: yellow; margin-top: 30px; font-size: 26px;">0%</div>
+                        
+                        <div class="chart-box theme-box">
+                            <h3 class="stab-title" style="margin-bottom: 10px;">LONGITUDINAL STRESS DISTRIBUTION (BM & SF)</h3>
+                            <div style="width: 100%; height: 180px; position: relative;">
+                                <canvas id="stressChart"></canvas>
+                            </div>
                         </div>
-                        <div class="stab-box">
-                            <h3 class="stab-title">SHEAR FORCE</h3>
-                            <div class="stab-val" id="big-val-sf" style="color: yellow; margin-top: 30px; font-size: 26px;">0%</div>
+                    </div>
+                </div>
+
+                <div id="view-loadicator" class="view-panel">
+                    <div class="header-title" style="margin-top:10px;">LOADICATOR & PLANNING</div>
+
+                    <div id="load-top-box" class="theme-box theme-box-border" style="margin: 0 10px 10px 10px; display: flex; align-items: center; justify-content: space-between; padding: 10px; border-radius: 5px;">
+                        <div>
+                            <span style="color: cyan; font-size: 14px; font-weight: bold;">DEFAULT CARGO:</span>
+                            <select id="cargo-select" class="tank-cargo-select" onchange="changeCargo()" style="margin-left: 10px; font-size: 14px; max-width: none; padding: 5px;"></select>
                         </div>
+                        <div id="cargo-density-display" style="color: yellow; font-family: monospace; font-size: 14px; font-weight: bold;">
+                            DENSITY @ 15°C: -- t/m3
+                        </div>
+                    </div>
+
+                    <div class="loadicator-layout">
+                        
+                        <div class="loadicator-panel" style="flex: 1.2;">
+                            <div class="loadicator-title">PLAN TANK VOLUMES (m3)</div>
+                            
+                            <div style="display: flex; gap: 15px; margin-top: 10px;">
+                                <div style="flex: 1;">
+                                    <div style="color:#00E5FF; font-size:12px; margin-bottom:5px; text-align:center;">CARGO TANKS</div>
+                                    <div id="loadicator-cargo-inputs"></div>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="color:#66B2FF; font-size:12px; margin-bottom:5px; text-align:center;">BALLAST TANKS</div>
+                                    <div id="loadicator-ballast-inputs"></div>
+                                </div>
+                            </div>
+
+                            <button onclick="runLoadicator()" style="width:100%; padding:12px; background:#00E5FF; color:black; font-weight:bold; cursor:pointer; margin-top:15px; border:none; border-radius:5px; transition: 0.2s;">CALCULATE ESTIMATE</button>
+                            
+                            <div class="ship-visuals" style="margin-top: 15px; border: 1px solid #333; background-color: #0A0A0A;">
+                                <div class="ship-img-container">
+                                    <div style="font-size: 11px; color: #00E5FF; font-weight: bold; z-index: 5; position: absolute; top: 5px; text-shadow: 1px 1px 2px #000;">PREDICTED BACK</div>
+                                    <img src="assets/back.png" id="img-pred-back" class="mini-img" onerror="this.src='back.png'">
+                                    <div class="mini-sea"></div>
+                                </div>
+                                <div class="ship-img-container">
+                                    <div style="font-size: 11px; color: #00E5FF; font-weight: bold; z-index: 5; position: absolute; top: 5px; text-shadow: 1px 1px 2px #000;">PREDICTED SIDE</div>
+                                    <img src="assets/side.png" id="img-pred-side" class="mini-img" onerror="this.src='side.png'">
+                                    <div class="mini-sea"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                            <div class="loadicator-panel" style="margin-bottom: 0;">
+                                <div class="loadicator-title">PREDICTED STABILITY</div>
+                                <div class="loadicator-res-box">
+                                    <div id="pred-draft">DRAFT FWD: -- | AFT: --</div>
+                                    <div id="pred-trim">TRIM: --</div>
+                                    <div id="pred-list">LIST: --</div>
+                                    <div id="pred-bm" class="text-warn">BM: --</div>
+                                    <div id="pred-sf" class="text-warn">SF: --</div>
+                                    <div id="pred-gm" class="text-safe">GM: --</div>
+                                </div>
+                            </div>
+                            
+                            <div class="loadicator-panel" style="flex-grow: 1;">
+                                <div class="loadicator-title">OPERATION CHECKLIST</div>
+                                <div style="display:flex; margin-bottom:10px;">
+                                    <input type="text" id="note-input" placeholder="e.g. Load 2W to 50%" style="flex-grow:1; padding:8px; background:#222; color:white; border:1px solid #555; border-radius:4px 0 0 4px; font-family: monospace;">
+                                    <button onclick="addNote()" style="padding:8px 15px; background:#00FF00; color:black; font-weight:bold; border:none; cursor:pointer; border-radius:0 4px 4px 0;">ADD</button>
+                                </div>
+                                <div id="note-list" style="overflow-y:auto; flex-grow:1; max-height: 200px;">
+                                    </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
@@ -463,11 +718,14 @@
             <div id="right-column">
                 <div class="panel-box">
                     <div class="header-title">STABILITY & STRESS</div>
-                    <div id="tv-list" class="val-stability">LIST: 0.00 deg</div>
-                    <div id="tv-trim" class="val-stability">TRIM: 0.00 m</div>
+                    <div id="tv-list" class="val-stability text-safe">LIST: 0.00 deg</div>
+                    <div id="tv-trim" class="val-stability text-safe">TRIM: 0.00 m</div>
                     <hr style="border-color: #333; margin: 10px 0;">
-                    <div id="tv-bm" class="val-stability" style="color: orange; font-size: 15px;">BM: 0.0% (SAFE)</div>
-                    <div id="tv-sf" class="val-stability" style="color: orange; font-size: 15px;">SF: 0.0% (SAFE)</div>
+                    <div id="tv-bm" class="val-stability text-warn" style="font-size: 15px;">BM: 0.0% (SAFE)</div>
+                    <div id="tv-sf" class="val-stability text-warn" style="font-size: 15px;">SF: 0.0% (SAFE)</div>
+                    <hr style="border-color: #333; margin: 10px 0;">
+                    <div id="tv-gm" class="val-stability text-safe" style="font-size: 15px;">GM: 0.00 m</div>
+                    <div id="tv-gz" class="val-stability text-safe" style="font-size: 15px;">GZ (10°): 0.00 m</div>
 
                     <div class="ship-visuals">
                         <div class="ship-img-container">
@@ -486,14 +744,14 @@
                 <div class="panel-box" style="flex-grow: 1; display: flex; flex-direction: column;">
                     <div class="header-title">CARGO LINES PRESSURE</div>
                     
-                    <div style="display: flex; justify-content: space-around; margin-top: 15px; margin-bottom: 5px; background: #0A0A0A; padding: 10px; border: 1px solid #333; border-radius: 8px;">
+                    <div class="theme-box" style="display: flex; justify-content: space-around; margin-top: 15px; margin-bottom: 5px; padding: 10px; border-radius: 8px;">
                         <div style="text-align: center;">
                             <div style="color: cyan; font-size: 12px; margin-bottom: 2px;">DRAFT FWD</div>
-                            <div id="tv-draft-fwd" style="font-family: monospace; font-size: 18px; font-weight: bold; color: white;">0.00 m</div>
+                            <div id="tv-draft-fwd" style="font-family: monospace; font-size: 18px; font-weight: bold; color: #00FF00;">0.00 m</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="color: cyan; font-size: 12px; margin-bottom: 2px;">DRAFT AFT</div>
-                            <div id="tv-draft-aft" style="font-family: monospace; font-size: 18px; font-weight: bold; color: white;">0.00 m</div>
+                            <div id="tv-draft-aft" style="font-family: monospace; font-size: 18px; font-weight: bold; color: #00FF00;">0.00 m</div>
                         </div>
                     </div>
 
@@ -506,8 +764,10 @@
                         <div id="tv-mani-press" class="dial-val" style="color: yellow;">0.0 BAR</div>
                     </div>
                     <div class="action-row">
-                        <div id="tv-rob" class="rob-val">ROB: 0.000 m3</div>
-                        <div>
+                        <div id="tv-rob" class="rob-val">ROB: 0.00 m3<br>0.00 MT</div>
+                        <div style="display: flex; gap: 5px;">
+                            <button id="btn-buzzer-stop" class="btn-buzzer">BUZZER<br>STOP</button>
+                            <button id="btn-estop" class="btn-estop">EMERGENCY<br>STOP</button>
                             <button id="btn-complete-main" class="btn-complete">COMPLETE<br>OPERATION</button>
                             <button id="btn-abort-main" class="btn-abort">ABORT<br>MISSION</button>
                         </div>
@@ -521,7 +781,9 @@
             <button class="nav-btn" onclick="switchTab('view-cargo', this)">CARGO SYSTEM</button>
             <button class="nav-btn" onclick="switchTab('view-ballast', this)">BALLAST SYSTEM</button>
             <button class="nav-btn" onclick="switchTab('view-stability', this)">STABILITY & STRESS</button>
+            <button class="nav-btn" onclick="switchTab('view-loadicator', this)">LOADICATOR</button>
             <button class="nav-btn" id="btn-speed" onclick="toggleSpeed()">1X SPEED</button>
+            <button class="nav-btn" id="btn-theme" onclick="toggleTheme()" style="color: #FFB300;">☀️ LIGHT</button>
         </div>
     </div>
 
@@ -553,1058 +815,7 @@
         </div>
     </div>
 
-    <script>
-        // --- MENÜ YÖNETİMİ ---
-        let currentMissionId = 1;
-        let tutStep = 0; // Eğitim adımları takibi
-
-        function navigate(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById('sim-container').style.display = 'none';
-            document.getElementById(screenId).classList.add('active');
-        }
-
-        function openBriefing(missionId) {
-            currentMissionId = missionId;
-            let titleStr = "";
-            let isLoad = (missionId === 2 || missionId === 4 || missionId === 5);
-
-            if(missionId === 1) titleStr = "DISCHARGING OPERATION";
-            else if(missionId === 2) titleStr = "LOADING OPERATION";
-            else if(missionId === 3) titleStr = "DYNAMIC DISCHARGE (RANDOM)";
-            else if(missionId === 4) titleStr = "DYNAMIC LOAD (RANDOM)";
-            else if(missionId === 5) titleStr = "LOADING TUTORIAL";
-            else if(missionId === 6) titleStr = "DISCHARGING TUTORIAL";
-            
-            document.getElementById('br-main-title').innerText = titleStr + " BRIEFING";
-
-            let constraintsText = document.getElementById('br-constraints-text');
-            if (isLoad) {
-                constraintsText.innerHTML = "• Maximum List: 1.0°<br>• Maximum Trim: 3.0m<br>• Minimum Draft: 3.0m";
-            } else {
-                constraintsText.innerHTML = "• Maximum List: 1.0°<br>• Maximum Trim: 3.0m<br>• Minimum Draft: 3.0m<br>• Max 4 Cargo Pumps running simultaneously<br>• Max Manifold Pressure: 10.0 bar";
-            }
-
-            navigate('screen-briefing');
-        }
-
-       function startSimulation() {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById('sim-container').style.display = 'flex';
-            
-            SimEngine.initTanks(currentMissionId); 
-            
-            let objText = "";
-            if(currentMissionId === 1) {
-                objText = "MISSION: DISCHARGE ALL CARGO TO SHORE";
-            } else if(currentMissionId === 2) {
-                objText = "MISSION: LOAD CARGO FROM SHORE";
-            } else if(currentMissionId === 3) {
-                // Tahliye için kalması gereken ROB hesaplanıyor
-                let targetRob = SimEngine.initialTotalVolume - SimEngine.targetOperationVolume;
-                objText = `MISSION: DISCHARGE ${SimEngine.targetOperationVolume} m3 (TARGET ROB: ${targetRob.toFixed(3)} m3)`;
-            } else if(currentMissionId === 4) {
-                // Yükleme için ulaşılması gereken ROB hesaplanıyor
-                let targetRob = SimEngine.initialTotalVolume + SimEngine.targetOperationVolume;
-                objText = `MISSION: LOAD ${SimEngine.targetOperationVolume} m3 (TARGET ROB: ${targetRob.toFixed(3)} m3)`;
-            } else if(currentMissionId === 5) {
-                objText = "TUTORIAL: LOAD CARGO";
-            } else if(currentMissionId === 6) {
-                objText = "TUTORIAL: DISCHARGE CARGO";
-            }
-            
-            document.getElementById('tv-objective').innerText = objText;
-
-            // Tutorial reset
-            tutStep = 0;
-            document.getElementById('tut-overlay').style.display = (currentMissionId === 5 || currentMissionId === 6) ? 'block' : 'none';
-
-            initUI();
-            SimEngine.isRunning = true;
-            setInterval(updateScreen, 100);
-        }
-
-        let currentSpeed = 1;
-        
-        function switchTab(viewId, btnElement) {
-            document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(viewId).classList.add('active');
-            btnElement.classList.add('active');
-        }
-
-        function toggleSpeed() {
-            const btn = document.getElementById('btn-speed');
-            if(currentSpeed === 1) { currentSpeed = 10; btn.innerText = "10X SPEED"; btn.style.color = "#FFD700"; }
-            else if(currentSpeed === 10) { currentSpeed = 50; btn.innerText = "50X SPEED"; btn.style.color = "#FF4500"; }
-            else { currentSpeed = 1; btn.innerText = "1X SPEED"; btn.style.color = "#666"; }
-        }
-
-        // --- FİZİK MOTORU (SimEngine) ---
-        const SimEngine = {
-            isRunning: false,
-            missionId: 1, 
-            shipList: 0, shipTrim: 0, linePressure: 0, manifoldPressure: 0,
-            bmPct: 0, bmType: "SAFE", sfPct: 0, draftFwd: 0, draftAft: 0,
-            manifold: false, 
-            currentAlarms: [], 
-
-            targetOperationVolume: 0, // NEW: Hedef Yük/Tahliye miktarı
-            initialTotalVolume: 0,    // NEW: Operasyon başındaki miktar
-
-            b_v1: false, b_v2: false, b_v3: false, b_v4: false,
-            b_v5: false, b_v6: false, b_v7: false, b_v8: false,
-
-            bpPortOn: false, bpStbdOn: false,
-            bpPortSpeed: 0, bpStbdSpeed: 0,
-
-            // GÜNCEL TANK YÜKSEKLİKLERİ VE HASSAS ULLAGE DEĞERLERİ
-            tanks: [
-                { id: "1P", isPort: true, isFwd: true, cap: 1061.145, height: 14.35, u978: 1.17, vol: 0, temp: 0, rate: 0, press: 20, pv: "CLOSED", pOn: false, pSpd: 0, vDisch: false, vDrop: false, vColl: false, hl: false, hhl: false, overfill: false },
-                { id: "2P", isPort: true, isFwd: true, cap: 1284.356, height: 14.38, u978: 1.19, vol: 0, temp: 0, rate: 0, press: 20, pv: "CLOSED", pOn: false, pSpd: 0, vDisch: false, vDrop: false, vColl: false, hl: false, hhl: false, overfill: false },
-                { id: "3P", isPort: true, isFwd: false, cap: 1284.254, height: 14.41, u978: 1.16, vol: 0, temp: 0, rate: 0, press: 20, pv: "CLOSED", pOn: false, pSpd: 0, vDisch: false, vDrop: false, vColl: false, hl: false, hhl: false, overfill: false },
-                { id: "4P", isPort: true, isFwd: false, cap: 1058.691, height: 14.45, u978: 1.14, vol: 0, temp: 0, rate: 0, press: 20, pv: "CLOSED", pOn: false, pSpd: 0, vDisch: false, vDrop: false, vColl: false, hl: false, hhl: false, overfill: false },
-                { id: "1S", isPort: false, isFwd: true, cap: 1060.838, height: 14.34, u978: 1.14, vol: 0, temp: 0, rate: 0, press: 20, pv: "CLOSED", pOn: false, pSpd: 0, vDisch: false, vDrop: false, vColl: false, hl: false, hhl: false, overfill: false },
-                { id: "2S", isPort: false, isFwd: true, cap: 1283.845, height: 14.39, u978: 1.18, vol: 0, temp: 0, rate: 0, press: 20, pv: "CLOSED", pOn: false, pSpd: 0, vDisch: false, vDrop: false, vColl: false, hl: false, hhl: false, overfill: false },
-                { id: "3S", isPort: false, isFwd: false, cap: 1282.924, height: 14.41, u978: 1.18, vol: 0, temp: 0, rate: 0, press: 20, pv: "CLOSED", pOn: false, pSpd: 0, vDisch: false, vDrop: false, vColl: false, hl: false, hhl: false, overfill: false },
-                { id: "4S", isPort: false, isFwd: false, cap: 1058.793, height: 14.46, u978: 1.16, vol: 0, temp: 0, rate: 0, press: 20, pv: "CLOSED", pOn: false, pSpd: 0, vDisch: false, vDrop: false, vColl: false, hl: false, hhl: false, overfill: false }
-            ],
-            ballastTanks: [
-                { id: "WB1P", isPort: true, isFwd: true, cap: 600, vol: 0, rate: 0, vOpen: false },
-                { id: "WB2P", isPort: true, isFwd: true, cap: 800, vol: 0, rate: 0, vOpen: false },
-                { id: "WB3P", isPort: true, isFwd: false, cap: 800, vol: 0, rate: 0, vOpen: false },
-                { id: "WB4P", isPort: true, isFwd: false, cap: 600, vol: 0, rate: 0, vOpen: false },
-                { id: "WB1S", isPort: false, isFwd: true, cap: 600, vol: 0, rate: 0, vOpen: false },
-                { id: "WB2S", isPort: false, isFwd: true, cap: 800, vol: 0, rate: 0, vOpen: false },
-                { id: "WB3S", isPort: false, isFwd: false, cap: 800, vol: 0, rate: 0, vOpen: false },
-                { id: "WB4S", isPort: false, isFwd: false, cap: 600, vol: 0, rate: 0, vOpen: false }
-            ],
-
-            initTanks: function(id) {
-                this.missionId = id;
-                this.b_v1 = false; this.b_v2 = false; this.b_v3 = false; this.b_v4 = false;
-                this.b_v5 = false; this.b_v6 = false; this.b_v7 = false; this.b_v8 = false;
-                this.bpPortOn = false; this.bpStbdOn = false;
-
-                this.tanks.forEach(t => { t.temp = (20.0 + Math.random() * 3.0).toFixed(1); });
-
-                if (id === 1) {
-                    this.tanks.forEach(t => { 
-                        t.vol = t.cap * 0.978; 
-                        t.press = Math.floor(Math.random() * 36) + 5; 
-                        t.pv = "CLOSED"; 
-                    });
-                    this.ballastTanks.forEach(t => { t.vol = 0; t.vOpen = false; });
-                } else if (id === 2) {
-                    this.tanks.forEach(t => { t.vol = 0; t.press = Math.floor(Math.random() * 36) + 5; t.pv = "CLOSED"; });
-                    this.ballastTanks.forEach(t => { t.vol = t.cap * 0.98; t.vOpen = false; });
-                } else if (id === 3 || id === 6) { 
-                    let fill = (id === 6) ? 0.6 : (0.5 + Math.random() * 0.35);
-                    for(let i=0; i<4; i++) {
-                        let f = fill;
-                        if(i === 2 || i === 3) f += 0.08; 
-                        if(f > 0.98) f = 0.98;
-                        let pT = this.tanks.find(t => t.id === `${i+1}P`);
-                        let sT = this.tanks.find(t => t.id === `${i+1}S`);
-                        pT.vol = pT.cap * f; pT.press = Math.floor(Math.random() * 36) + 5; pT.pv = "CLOSED";
-                        sT.vol = sT.cap * f; sT.press = Math.floor(Math.random() * 36) + 5; sT.pv = "CLOSED";
-                    }
-                    this.ballastTanks.forEach(t => { t.vol = 0; t.vOpen = false; });
-                } else if (id === 5) {
-                    // TUTORIAL LOADING - Ballastlar %98 Dolu
-                    this.tanks.forEach(t => { t.vol = 0; t.press = Math.floor(Math.random() * 36) + 5; t.pv = "CLOSED"; });
-                    this.ballastTanks.forEach(t => { t.vol = t.cap * 0.98; t.vOpen = false; });
-                } else if (id === 4) {
-                    this.tanks.forEach(t => { t.vol = 0; t.press = Math.floor(Math.random() * 36) + 5; t.pv = "CLOSED"; });
-                    let bfill = 0.5 + Math.random() * 0.3;
-                    for(let i=0; i<4; i++) {
-                        let f = bfill;
-                        if(i === 2 || i === 3) f += 0.15; 
-                        if(f > 0.98) f = 0.98;
-                        let bP = this.ballastTanks.find(t => t.id === `WB${i+1}P`);
-                        let bS = this.ballastTanks.find(t => t.id === `WB${i+1}S`);
-                        bP.vol = bP.cap * f;
-                        bS.vol = bS.cap * f;
-                    }
-                }
-
-                // NEW: Operasyon başlangıcı hacim tespiti ve Random görevler için hedef tayini
-                let startVol = 0;
-                this.tanks.forEach(t => startVol += t.vol);
-                this.initialTotalVolume = startVol;
-
-                if (id === 3) { 
-                    // Random Discharge Target (Sahip olunan yükten bir miktar tahliye)
-                    let maxD = startVol > 1500 ? startVol - 200 : 1000;
-                    this.targetOperationVolume = Math.floor(Math.random() * (maxD - 800) + 800);
-                } else if (id === 4) { 
-                    // Random Load Target (Boş gemiye kapasite dahilinde yükleme)
-                    this.targetOperationVolume = Math.floor(Math.random() * (8000 - 2000) + 2000);
-                } else {
-                    this.targetOperationVolume = 0; // Diğer senaryolar (Tutorial vs)
-                }
-            },
-
-            triggerGameOver: function(reason) {
-                this.isRunning = false;
-                document.getElementById('game-over-reason').innerHTML = reason;
-                document.getElementById('game-over-modal').style.display = 'flex';
-            },
-
-            updatePhysics: function() {
-                if(!this.isRunning) return;
-                for(let step = 0; step < currentSpeed; step++) {
-                    this.updatePhysicsStep(1); 
-                    if(!this.isRunning) break; 
-                }
-            },
-
-            updatePhysicsStep: function(scale) {
-                let totalPumpRate = 0;
-                let dropTankCount = 0;
-                let outRates = Array(8).fill(0);
-                let rawRates = Array(8).fill(0);
-                let activeAlarms = [];
-                let activePumpsCount = 0;
-                
-                let isLoadMission = (this.missionId === 2 || this.missionId === 4 || this.missionId === 5);
-
-                // --- CARGO SYSTEM PHYSICS ---
-                let rawPumpTotal = 0;
-                this.tanks.forEach((t, i) => {
-                    t.rate = 0;
-                    if(t.pOn && t.pSpd > 0 && t.vol > 0) {
-                        activePumpsCount++;
-                        if(t.vDisch && t.vColl) {
-                            rawRates[i] = 1000 * (t.pSpd / 100); 
-                            rawPumpTotal += rawRates[i];
-                        }
-                    }
-                    if(t.vDrop && t.vColl) dropTankCount++;
-                });
-
-                if (!isLoadMission && activePumpsCount > 4) {
-                    this.triggerGameOver("CRITICAL VIOLATION:<br>MAX 4 CARGO PUMPS ALLOWED!");
-                    return;
-                }
-
-                if(rawPumpTotal > 2000) {
-                    let scaleFactor = 2000 / rawPumpTotal;
-                    for(let i=0; i<8; i++) rawRates[i] *= scaleFactor;
-                }
-
-                for(let i=0; i<8; i++) {
-                    if(rawRates[i] > 0) {
-                        outRates[i] = rawRates[i] * (0.95 + Math.random() * 0.05);
-                        totalPumpRate += outRates[i];
-                    }
-                }
-
-                let targetLinePress = 0;
-                let targetManiPress = 0;
-                let shoreInflowRate = 0;
-
-                let reliefFactor = dropTankCount > 0 ? (1 / (dropTankCount + 1)) : 1; 
-
-                if (this.manifold) {
-                    if (isLoadMission) {
-                        if (dropTankCount === 0) {
-                            targetManiPress = 1.5 + (Math.random() * 0.5); 
-                            targetLinePress = targetManiPress;
-                        } else if (dropTankCount === 1) {
-                            targetManiPress = 1.5 + (Math.random() * 0.5); 
-                            targetLinePress = targetManiPress;
-                            shoreInflowRate = 1200 + (Math.random() * 100); 
-                        } else if (dropTankCount === 2) {
-                            targetManiPress = 0.3 + (Math.random() * 0.2); 
-                            targetLinePress = targetManiPress;
-                            shoreInflowRate = 1800 + (Math.random() * 100); 
-                        } else {
-                            targetManiPress = 0.0 + (Math.random() * 0.1); 
-                            targetLinePress = targetManiPress;
-                            shoreInflowRate = 2000; 
-                        }
-                    } else {
-                        if (totalPumpRate > 0) {
-                            let flowUnits = dropTankCount + 2;
-                            let flowPerUnit = totalPumpRate / flowUnits;
-                            let shoreOutflow = flowPerUnit * 2;
-                            
-                            targetLinePress = ((totalPumpRate / 2000) * 10.5 * reliefFactor) + (Math.random() * 0.2);
-                            targetManiPress = targetLinePress - ((shoreOutflow / 2000) * 1.2);
-                        }
-                    }
-                } else {
-                    if (totalPumpRate > 0) {
-                        targetLinePress = dropTankCount > 0 ? ((totalPumpRate / 2000) * 6 * reliefFactor) + (Math.random() * 0.2) : 16 + (Math.random() * 0.5);
-                    }
-                }
-
-                this.linePressure += (targetLinePress - this.linePressure) * 0.1;
-                this.manifoldPressure += (targetManiPress - this.manifoldPressure) * 0.1;
-
-                if (!isLoadMission && this.manifoldPressure > 10.0) {
-                    this.triggerGameOver("PIPE BURST:<br>MANIFOLD PRESSURE EXCEEDED 10.0 BAR!");
-                    return;
-                }
-
-                this.tanks.forEach((t, i) => {
-                    let netFlow = 0;
-                    if (outRates[i] > 0) netFlow -= outRates[i];
-                    if (t.vDrop && t.vColl) {
-                        if (isLoadMission && this.manifold) {
-                            netFlow += (shoreInflowRate / dropTankCount) * (0.95 + Math.random() * 0.1);
-                        } else if (!isLoadMission && dropTankCount > 0 && totalPumpRate > 0) {
-                            let flowPerUnit = totalPumpRate / (dropTankCount + (this.manifold ? 2 : 0));
-                            netFlow += flowPerUnit * (0.92 + Math.random() * 0.10);
-                        }
-                    }
-
-                    t.rate = Math.abs(netFlow);
-
-                    if (netFlow !== 0) {
-                        let volChange = ((netFlow / 3600) / 10) * scale;
-                        t.vol += volChange;
-                        if (t.vol <= 0) { t.vol = 0; t.rate = 0; }
-
-                        let emptyVol = Math.max(10, t.cap - t.vol); 
-                        let pressChangeRate = (netFlow / emptyVol) * 0.4 * scale; 
-                        if(t.pv === "CLOSED") { t.press += pressChangeRate; }
-                    } else {
-                        if(t.pv === "CLOSED") { t.press += (20 - t.press) * 0.02 * scale; }
-                    }
-
-                    if (t.pv === "CLOSED") {
-                        if (t.press >= 215) t.pv = "OPEN (PRESS)";
-                        else if (t.press <= -39) t.pv = "OPEN (VACUUM)";
-                    } 
-                    
-                    if (t.pv === "OPEN (PRESS)") {
-                        t.press -= 2.0 * scale; 
-                        if (t.press <= 110) t.pv = "CLOSED"; 
-                    } else if (t.pv === "OPEN (VACUUM)") {
-                        t.press += 1.5 * scale; 
-                        if (t.press >= -36) t.pv = "CLOSED"; 
-                    }
-                    
-                    if (t.press < -45) t.press = -45;
-                    if (t.press > 240) t.press = 240; 
-
-                    let pct = (t.vol / t.cap) * 100;
-                    if (pct >= 100) {
-                        this.triggerGameOver(`CARGO SPILLED:<br>TANK ${t.id} OVERFILLED!`);
-                        return;
-                    } else if (pct >= 98) {
-                        t.hhl = true; t.overfill = false; t.hl = false;
-                        activeAlarms.push(`HHL (98%) IN ${t.id}`);
-                    } else if (pct >= 95) {
-                        t.hl = true; t.hhl = false; t.overfill = false;
-                        activeAlarms.push(`HL (95%) IN ${t.id}`);
-                    } else {
-                        t.hl = false; t.hhl = false; t.overfill = false;
-                    }
-                });
-
-                this.currentAlarms = activeAlarms;
-
-                // --- YENİ BALLAST FİZİK MOTORU ---
-                let portLineIn = 0, portLineOut = 0;
-                let stbdLineIn = 0, stbdLineOut = 0;
-
-                let pPRate = this.bpPortOn ? (this.bpPortSpeed / 100) * 850 : 0;
-                if (pPRate > 0) {
-                    let src = 'none';
-                    if (this.b_v3) src = 'port'; 
-                    else if (this.b_v1 && this.b_v2) src = 'sea'; 
-
-                    let dst = 'none';
-                    if (this.b_v4) dst = 'ovbd'; 
-                    else if (this.b_v5) dst = 'stbd'; 
-                    else dst = 'port'; 
-
-                    if (src !== 'none' && dst !== 'none') {
-                        if (src === 'port') portLineOut += pPRate;
-                        if (dst === 'port') portLineIn += pPRate;
-                        if (dst === 'stbd') stbdLineIn += pPRate;
-                    }
-                }
-
-                let pSRate = this.bpStbdOn ? (this.bpStbdSpeed / 100) * 850 : 0;
-                if (pSRate > 0) {
-                    let src = 'none';
-                    if (this.b_v7) src = 'stbd'; 
-                    else if (this.b_v1 && this.b_v6) src = 'sea'; 
-
-                    let dst = 'none';
-                    if (this.b_v8) dst = 'ovbd'; 
-                    else if (this.b_v5) dst = 'port'; 
-                    else dst = 'stbd'; 
-
-                    if (src !== 'none' && dst !== 'none') {
-                        if (src === 'stbd') stbdLineOut += pSRate;
-                        if (dst === 'stbd') stbdLineIn += pSRate;
-                        if (dst === 'port') portLineIn += pSRate;
-                    }
-                }
-
-                let pTanksOpen = this.ballastTanks.filter(t => t.isPort && t.vOpen);
-                let sTanksOpen = this.ballastTanks.filter(t => !t.isPort && t.vOpen);
-                
-                let pFillPerTank = pTanksOpen.length > 0 ? portLineIn / pTanksOpen.length : 0;
-                let pDischPerTank = pTanksOpen.length > 0 ? portLineOut / pTanksOpen.length : 0;
-                
-                let sFillPerTank = sTanksOpen.length > 0 ? stbdLineIn / sTanksOpen.length : 0;
-                let sDischPerTank = sTanksOpen.length > 0 ? stbdLineOut / sTanksOpen.length : 0;
-
-                this.ballastTanks.forEach(t => {
-                    t.rate = 0;
-                    if (t.vOpen) {
-                        let netFlow = 0;
-                        if (t.isPort) netFlow = pFillPerTank - pDischPerTank;
-                        else netFlow = sFillPerTank - sDischPerTank;
-
-                        if (netFlow !== 0) {
-                            netFlow *= (0.92 + Math.random() * 0.10); 
-                            t.rate = Math.abs(netFlow);
-                            
-                            let change = ((netFlow / 3600) / 10) * scale;
-                            if(change > 0) {
-                                if(t.vol + change <= t.cap) t.vol += change; else t.rate = 0;
-                            } else if (change < 0) {
-                                if(t.vol >= Math.abs(change)) t.vol += change; else { t.rate = 0; t.vol = 0; }
-                            }
-                        }
-                    }
-                });
-
-                // --- STABILITY & DRAFT CALCULATION ---
-                let wPort = 0, wStbd = 0, wFwd = 0, wAft = 8.3333; 
-                this.tanks.forEach(t => {
-                    if(t.isPort) wPort += t.vol; else wStbd += t.vol;
-                    if(t.isFwd) wFwd += t.vol; else wAft += t.vol;
-                });
-                this.ballastTanks.forEach(t => {
-                    if(t.isPort) wPort += t.vol; else wStbd += t.vol;
-                    if(t.isFwd) wFwd += t.vol; else wAft += t.vol;
-                });
-
-                this.shipList = (wStbd - wPort) * 0.008;
-                this.shipTrim = (wAft - wFwd) * 0.003;
-
-                const lightShip = 4000;
-                const maxC = 9465.8; // Approx max cargo capacity
-                let currentC = 0, currentB = 0;
-                this.tanks.forEach(t => currentC += t.vol);
-                this.ballastTanks.forEach(t => currentB += t.vol);
-
-                // Ortama Draft Hesaplaması (Kargo ve Balast ayrıştırılarak)
-                let meanDraft = 2.00 + (currentC / maxC) * 8.00 + (currentB / 5600) * 4.00; 
-                this.draftAft = meanDraft + (this.shipTrim / 2);
-                this.draftFwd = meanDraft - (this.shipTrim / 2);
-
-                let weightBlocks = [0, 0, 0, 0]; 
-                this.tanks.forEach(t => {
-                    if(t.id.includes("1")) weightBlocks[0] += t.vol;
-                    if(t.id.includes("2")) weightBlocks[1] += t.vol;
-                    if(t.id.includes("3")) weightBlocks[2] += t.vol;
-                    if(t.id.includes("4")) weightBlocks[3] += t.vol;
-                });
-                this.ballastTanks.forEach(t => {
-                    if(t.id.includes("1")) weightBlocks[0] += t.vol;
-                    if(t.id.includes("2")) weightBlocks[1] += t.vol;
-                    if(t.id.includes("3")) weightBlocks[2] += t.vol;
-                    if(t.id.includes("4")) weightBlocks[3] += t.vol;
-                });
-
-                let meanW = (weightBlocks[0] + weightBlocks[1] + weightBlocks[2] + weightBlocks[3]) / 4;
-                
-                let s1 = weightBlocks[0] - meanW;
-                let s2 = s1 + weightBlocks[1] - meanW;
-                let s3 = s2 + weightBlocks[2] - meanW;
-                let sfMaxRaw = Math.max(Math.abs(s1), Math.abs(s2), Math.abs(s3));
-                
-                let b1 = s1;
-                let b2 = b1 + s2;
-                let b3 = b2 + s3;
-                let bmMaxRaw = Math.max(Math.abs(b1), Math.abs(b2), Math.abs(b3));
-
-                let isSagging = (weightBlocks[1] + weightBlocks[2]) > (weightBlocks[0] + weightBlocks[3]);
-                
-                this.sfPct = (sfMaxRaw / 2800) * 100;
-                this.bmPct = (bmMaxRaw / 4000) * 100;
-                this.bmType = isSagging ? "SAGGING" : "HOGGING";
-
-                if (Math.abs(this.shipList) > 1.0) {
-                    this.triggerGameOver(`CAPSIZED:<br>LIST EXCEEDED 1.0° (CURRENT: ${Math.abs(this.shipList).toFixed(2)}°)`);
-                    return;
-                }
-                if (Math.abs(this.shipTrim) > 3.0) {
-                    this.triggerGameOver(`STRUCTURAL DAMAGE:<br>TRIM EXCEEDED 3.0m (CURRENT: ${Math.abs(this.shipTrim).toFixed(2)}m)`);
-                    return;
-                }
-                if (this.bmPct > 100.0) {
-                    this.triggerGameOver(`HULL BREACH:<br>BENDING MOMENT EXCEEDED 100%`);
-                    return;
-                }
-                if (this.sfPct > 100.0) {
-                    this.triggerGameOver(`HULL BREACH:<br>SHEAR FORCE EXCEEDED 100%`);
-                    return;
-                }
-                
-                // MİNİMUM DRAFT KONTROLÜ (Gemi havalanamaz)
-                if (this.draftFwd < 3.00 || this.draftAft < 3.00) {
-                    this.triggerGameOver(`MINIMUM DRAFT VIOLATION:<br>DRAFT DROPPED BELOW 3.00m!<br>(FWD: ${this.draftFwd.toFixed(2)}m, AFT: ${this.draftAft.toFixed(2)}m)`);
-                    return;
-                }
-            }
-        };
-
-        // --- P&ID MIMIC PANEL SATIR ÜRETİCİSİ ---
-        function buildMimicRow(portTank, stbdTank) {
-            return `
-                <div class="m-row" style="display:flex; width:100%; height:130px; align-items:center; position:relative; z-index:2; margin-bottom: 20px;">
-                    
-                    <div class="m-port-side" style="flex:1; display:flex; align-items:center; justify-content:flex-end; padding-right:0;">
-                        <div class="m-tank-container" style="display:flex; flex-direction:column; align-items:center; margin-right:-4px; z-index:5;">
-                            <div class="m-tank">${portTank.id}</div>
-                            <div id="tv-pspd-${portTank.id}" style="font-size:10px; color:yellow; margin-top:4px;">0%</div>
-                            <input type="range" class="slider" id="sb-pspd-${portTank.id}" min="0" max="100" value="0" style="width:50px; margin:0; cursor:pointer;">
-                        </div>
-                        
-                        <div class="m-parallel-port" style="width:140px; min-width:140px; height:60px; border-top:4px solid #555; border-bottom:4px solid #555; border-right:4px solid #555; position:relative; z-index:2;">
-                            <div class="m-valve" id="mimic-vDrop-${portTank.id}" style="position:absolute; bottom:-15px; right:35px;"></div>
-                            <div class="m-label" style="position:absolute; bottom:-35px; right:30px; text-align:center; width:40px;">DROP</div>
-                            
-                            <div class="m-valve" id="mimic-vDisch-${portTank.id}" style="position:absolute; top:-15px; right:15px;"></div>
-                            <div class="m-label" style="position:absolute; top:-35px; right:10px; text-align:center; width:40px;">DISCH</div>
-                            
-                            <div class="m-pump" id="mimic-pOn-${portTank.id}" style="position:absolute; top:-17px; left:10px;">&#9654;</div>
-                            <div class="m-label" style="position:absolute; top:-35px; left:5px; text-align:center; width:40px;">PUMP</div>
-                        </div>
-                        
-                        <div style="flex-grow:1; height:4px; background:#555; position:relative; display:flex; align-items:center; justify-content:center; min-width:50px;">
-                            <div class="m-valve" id="mimic-vColl-${portTank.id}"></div>
-                            <div class="m-label" style="position:absolute; top:-25px; white-space:nowrap;">${portTank.id} COLL</div>
-                        </div>
-                    </div>
-                    
-                    <div style="width:16px; background: transparent;"></div> 
-
-                    <div class="m-stbd-side" style="flex:1; display:flex; align-items:center; justify-content:flex-start; padding-left:0;">
-                        
-                        <div style="flex-grow:1; height:4px; background:#555; position:relative; display:flex; align-items:center; justify-content:center; min-width:50px;">
-                            <div class="m-valve" id="mimic-vColl-${stbdTank.id}"></div>
-                            <div class="m-label" style="position:absolute; top:-25px; white-space:nowrap;">${stbdTank.id} COLL</div>
-                        </div>
-                        
-                        <div class="m-parallel-stbd" style="width:140px; min-width:140px; height:60px; border-top:4px solid #555; border-bottom:4px solid #555; border-left:4px solid #555; position:relative; z-index:2;">
-                            <div class="m-pump" id="mimic-pOn-${stbdTank.id}" style="position:absolute; top:-17px; right:10px;">&#9664;</div>
-                            <div class="m-label" style="position:absolute; top:-35px; right:5px; text-align:center; width:40px;">PUMP</div>
-                            
-                            <div class="m-valve" id="mimic-vDisch-${stbdTank.id}" style="position:absolute; top:-15px; left:15px;"></div>
-                            <div class="m-label" style="position:absolute; top:-35px; left:10px; text-align:center; width:40px;">DISCH</div>
-                            
-                            <div class="m-valve" id="mimic-vDrop-${stbdTank.id}" style="position:absolute; bottom:-15px; left:35px;"></div>
-                            <div class="m-label" style="position:absolute; bottom:-35px; left:30px; text-align:center; width:40px;">DROP</div>
-                        </div>
-                        
-                        <div class="m-tank-container" style="display:flex; flex-direction:column; align-items:center; margin-left:-4px; z-index:5;">
-                            <div class="m-tank">${stbdTank.id}</div>
-                            <div id="tv-pspd-${stbdTank.id}" style="font-size:10px; color:yellow; margin-top:4px;">0%</div>
-                            <input type="range" class="slider" id="sb-pspd-${stbdTank.id}" min="0" max="100" value="0" style="width:50px; margin:0; cursor:pointer;">
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // --- ARAYÜZ (UI) OLUŞTURMA ---
-        function initUI() {
-            // 1. OVERVIEW EKRANI
-            const ovPort = document.getElementById('ov-row-port');
-            const ovStbd = document.getElementById('ov-row-stbd');
-            ovPort.innerHTML = ""; ovStbd.innerHTML = ""; 
-
-            const portTanksReversed = [...SimEngine.tanks.filter(t => t.isPort)].reverse();
-            const stbdTanksReversed = [...SimEngine.tanks.filter(t => !t.isPort)].reverse();
-
-            const markersHTML = `<div class="tank-markers">` + 
-                [90,80,70,60,50,40,30,20,10].map(m => `<div class="marker-line" style="bottom:${m}%">${m}</div>`).join('') + 
-                `</div>`;
-
-            portTanksReversed.forEach(t => {
-                ovPort.innerHTML += `
-                    <div class="tank-box">
-                        <div class="tank-name">${t.id} <span class="val-temp" id="ov-temp-${t.id}" style="margin-left:5px; font-size:10px;">${t.temp}°C</span></div>
-                        <div class="tank-frame" id="frame-${t.id}">
-                            <div id="ov-liq-${t.id}" class="liquid" style="height:0%;"></div>
-                            ${markersHTML}
-                        </div>
-                        <div class="tank-info val-vol" id="ov-vol-${t.id}">0.0 m3</div>
-                        <div class="tank-info val-ullage" id="ov-ull-${t.id}">ULL: 0.00 m</div>
-                        <div class="tank-info val-rate" id="ov-rate-${t.id}">0 m3/h</div>
-                        <div class="tank-info val-press" id="ov-press-${t.id}">0 mbar</div>
-                        <div class="tank-info" id="ov-pv-${t.id}" style="color: gray; font-weight: bold; margin-top: 2px;">PV: CLOSED</div>
-                    </div>`;
-            });
-
-            stbdTanksReversed.forEach(t => {
-                ovStbd.innerHTML += `
-                    <div class="tank-box">
-                        <div class="tank-name">${t.id} <span class="val-temp" id="ov-temp-${t.id}" style="margin-left:5px; font-size:10px;">${t.temp}°C</span></div>
-                        <div class="tank-frame" id="frame-${t.id}">
-                            <div id="ov-liq-${t.id}" class="liquid" style="height:0%;"></div>
-                            ${markersHTML}
-                        </div>
-                        <div class="tank-info val-vol" id="ov-vol-${t.id}">0.0 m3</div>
-                        <div class="tank-info val-ullage" id="ov-ull-${t.id}">ULL: 0.00 m</div>
-                        <div class="tank-info val-rate" id="ov-rate-${t.id}">0 m3/h</div>
-                        <div class="tank-info val-press" id="ov-press-${t.id}">0 mbar</div>
-                        <div class="tank-info" id="ov-pv-${t.id}" style="color: gray; font-weight: bold; margin-top: 2px;">PV: CLOSED</div>
-                    </div>`;
-            });
-
-            // 2. CARGO EKRANI
-            let mimicRowsHtml = "";
-            for(let i=1; i<=4; i++) {
-                let pTank = SimEngine.tanks.find(t => t.id === `${i}P`);
-                let sTank = SimEngine.tanks.find(t => t.id === `${i}S`);
-                mimicRowsHtml += buildMimicRow(pTank, sTank);
-            }
-            document.getElementById('mimic-rows-container').innerHTML = mimicRowsHtml;
-
-            document.getElementById('mimic-mani-val').onclick = function() { toggleEngineState(null, 'manifold'); };
-
-            setTimeout(() => {
-                SimEngine.tanks.forEach(t => {
-                    document.getElementById(`mimic-vDrop-${t.id}`).onclick = function(){ toggleEngineState(t.id, 'vDrop'); };
-                    document.getElementById(`mimic-vDisch-${t.id}`).onclick = function(){ toggleEngineState(t.id, 'vDisch'); };
-                    document.getElementById(`mimic-vColl-${t.id}`).onclick = function(){ toggleEngineState(t.id, 'vColl'); };
-                    document.getElementById(`mimic-pOn-${t.id}`).onclick = function(){ toggleEngineState(t.id, 'pOn'); };
-                    
-                    let slider = document.getElementById(`sb-pspd-${t.id}`);
-                    slider.oninput = function() {
-                        if(currentSpeed > 1) { this.value = t.pSpd; return; }
-                        t.pSpd = this.value;
-                        document.getElementById(`tv-pspd-${t.id}`).innerText = `${this.value}%`;
-                    };
-                });
-            }, 100);
-
-            // 3. BALLAST EKRANI
-            const blRowAll = document.getElementById('bl-row-all');
-            const blValvesP = document.getElementById('bl-valves-port'); const blValvesS = document.getElementById('bl-valves-stbd');
-            blRowAll.innerHTML = ""; blValvesP.innerHTML = ""; blValvesS.innerHTML = ""; 
-            
-            const blOrder = ["WB4P", "WB4S", "WB3P", "WB3S", "WB2P", "WB2S", "WB1P", "WB1S"];
-            blOrder.forEach(id => {
-                let t = SimEngine.ballastTanks.find(x => x.id === id);
-                blRowAll.innerHTML += `
-                    <div class="tank-box" style="margin:2px; padding:5px;">
-                        <div class="tank-name" style="font-size:11px;">${t.id}</div>
-                        <div class="tank-frame">
-                            <div id="bl-liq-${t.id}" class="liquid liquid-ballast" style="height:0%;"></div>
-                            ${markersHTML}
-                        </div>
-                        <div class="tank-info val-vol" id="bl-vol-${t.id}">0.0 m3</div>
-                        <div class="tank-info val-rate" id="bl-rate-${t.id}" style="color: #00FF00;">0 m3/h</div>
-                    </div>`;
-            });
-
-            SimEngine.ballastTanks.filter(t => t.isPort).reverse().forEach(t => {
-                blValvesP.innerHTML += `<button id="btn-bvalve-${t.id}" class="btn-toggle" style="margin:2px; padding:5px; font-size:10px;">${t.id}</button>`;
-            });
-            SimEngine.ballastTanks.filter(t => !t.isPort).reverse().forEach(t => {
-                blValvesS.innerHTML += `<button id="btn-bvalve-${t.id}" class="btn-toggle" style="margin:2px; padding:5px; font-size:10px;">${t.id}</button>`;
-            });
-
-            setTimeout(() => {
-                SimEngine.ballastTanks.forEach(t => {
-                    document.getElementById(`btn-bvalve-${t.id}`).onclick = function(){ 
-                        if(currentSpeed > 1) return;
-                        t.vOpen = !t.vOpen; 
-                        this.classList.toggle('on');
-                    };
-                });
-
-                for(let i=1; i<=8; i++) {
-                    let vId = 'v' + i;
-                    document.getElementById(vId).onclick = function() {
-                        if(currentSpeed > 1) return;
-                        SimEngine['b_' + vId] = !SimEngine['b_' + vId];
-                    };
-                }
-
-                document.getElementById('pP').onclick = function(){
-                    if(currentSpeed > 1) return;
-                    SimEngine.bpPortOn = !SimEngine.bpPortOn;
-                }
-                document.getElementById('pS').onclick = function(){
-                    if(currentSpeed > 1) return;
-                    SimEngine.bpStbdOn = !SimEngine.bpStbdOn;
-                }
-
-                document.getElementById('sb-bp-port').oninput = function() {
-                    if(currentSpeed > 1) { this.value = SimEngine.bpPortSpeed; return; }
-                    SimEngine.bpPortSpeed = this.value; document.getElementById('tv-bp-port-spd').innerText = `${this.value}%`;
-                };
-                document.getElementById('sb-bp-stbd').oninput = function() {
-                    if(currentSpeed > 1) { this.value = SimEngine.bpStbdSpeed; return; }
-                    SimEngine.bpStbdSpeed = this.value; document.getElementById('tv-bp-stbd-spd').innerText = `${this.value}%`;
-                };
-            }, 100);
-        }
-
-        function toggleEngineState(tankId, prop) {
-            if(currentSpeed > 1) return; 
-            if(tankId == null) {
-                SimEngine[prop] = !SimEngine[prop];
-            } else {
-                let t = SimEngine.tanks.find(x => x.id === tankId);
-                if(t) t[prop] = !t[prop];
-            }
-        }
-
-        // --- DİNAMİK TUTORIAL GÜNCELLEMESİ (ADIM ADIM) ---
-        function updateTutorial() {
-            if (currentMissionId !== 5 && currentMissionId !== 6) return;
-            
-            let title = document.getElementById('tut-title');
-            let msg = document.getElementById('tut-msg');
-            let activeTab = document.querySelector('.view-panel.active').id;
-
-            if (currentMissionId === 5) { // LOADING TUTORIAL
-                if (tutStep === 0) {
-                    title.innerText = "TUTORIAL: STEP 1/10";
-                    msg.innerHTML = "Welcome to Loading Operations! First, switch to the <span class='tut-hl'>CARGO SYSTEM</span> tab from the bottom menu.";
-                    if (activeTab === 'view-cargo') tutStep++;
-                } else if (tutStep === 1) {
-                    title.innerText = "TUTORIAL: STEP 2/10";
-                    msg.innerHTML = "To start loading, first open the <span class='tut-hl'>DROP</span> valve for any empty tank.";
-                    if (SimEngine.tanks.some(t => t.vDrop)) tutStep++;
-                } else if (tutStep === 2) {
-                    title.innerText = "TUTORIAL: STEP 3/10";
-                    msg.innerHTML = "Next, open the <span class='tut-hl'>COLL</span> (Collector) valve for the same tank so it connects to the main line.";
-                    if (SimEngine.tanks.some(t => t.vColl)) tutStep++;
-                } else if (tutStep === 3) {
-                    title.innerText = "TUTORIAL: STEP 4/10";
-                    msg.innerHTML = "Finally, click the <span class='tut-hl'>COMMON MANIFOLD</span> valve (the red circle at the top) to let the shore cargo flow into the ship.";
-                    if (SimEngine.manifold) tutStep++;
-                } else if (tutStep === 4) {
-                    title.innerText = "TUTORIAL: STEP 5/10";
-                    msg.innerHTML = "Cargo is flowing! As cargo enters, the ship gets heavier, so we must DISCHARGE ballast. Switch to the <span class='tut-hl'>BALLAST SYSTEM</span> tab.";
-                    if (activeTab === 'view-ballast') tutStep++;
-                } else if (tutStep === 5) {
-                    title.innerText = "TUTORIAL: STEP 6/10";
-                    msg.innerHTML = "To pump ballast overboard, open a <span class='tut-hl'>Port Tank valve</span> (like WB4P) on the right, then open <span class='tut-hl'>V3 (Tank Suction)</span> and <span class='tut-hl'>V4 (Overboard)</span>.";
-                    let tOpen = SimEngine.ballastTanks.some(t => t.vOpen && t.isPort);
-                    if (SimEngine.b_v3 && SimEngine.b_v4 && tOpen) tutStep++;
-                } else if (tutStep === 6) {
-                    title.innerText = "TUTORIAL: STEP 7/10";
-                    msg.innerHTML = "Now turn on the <span class='tut-hl'>Port Pump (P)</span> and move its slider slightly to the right to pump the water out to sea.";
-                    if (SimEngine.bpPortOn && SimEngine.bpPortSpeed > 0) tutStep++;
-                } else if (tutStep === 7) {
-                    title.innerText = "TUTORIAL: STEP 8/10";
-                    msg.innerHTML = "Excellent! Let's check the ship's safety limits. Switch to the <span class='tut-hl'>STABILITY & STRESS</span> tab.";
-                    if (activeTab === 'view-stability') tutStep++;
-                } else if (tutStep === 8) {
-                    title.innerText = "TUTORIAL: STEP 9/10";
-                    msg.innerHTML = "Be extremely careful! <span class='tut-hl'>BM & SF must not exceed 100%</span>, <span class='tut-hl'>Trim must be < 3.0m</span>, and <span class='tut-hl'>List < 1.0°</span>. If you exceed these, the mission fails! Switch back to <span class='tut-hl'>OVERVIEW</span>.";
-                    if (activeTab === 'view-overview') tutStep++;
-                } else if (tutStep === 9) {
-                    title.innerText = "TUTORIAL: STEP 10/10";
-                    msg.innerHTML = "You are fully in control! Use the <span class='tut-hl'>1X SPEED</span> button at the bottom to switch to 10X or 50X speed so you don't wait hours. <br><br><span style='color:red;'>WARNING: Never let any tank exceed 98%!</span> Good luck!";
-                }
-            } else if (currentMissionId === 6) { // DISCHARGING TUTORIAL
-                if (tutStep === 0) {
-                    title.innerText = "TUTORIAL: STEP 1/13";
-                    msg.innerHTML = "Welcome to Discharging Operations! Let's begin by switching to the <span class='tut-hl'>CARGO SYSTEM</span> tab.";
-                    if (activeTab === 'view-cargo') tutStep++;
-                } else if (tutStep === 1) {
-                    title.innerText = "TUTORIAL: STEP 2/13";
-                    msg.innerHTML = "First, start the <span class='tut-hl'>PUMP (▶)</span> for any of the loaded tanks.";
-                    if (SimEngine.tanks.some(t => t.pOn)) tutStep++;
-                } else if (tutStep === 2) {
-                    title.innerText = "TUTORIAL: STEP 3/13";
-                    msg.innerHTML = "Now open the <span class='tut-hl'>DISCH</span> valve for that tank to let the pump push the cargo out.";
-                    if (SimEngine.tanks.some(t => t.vDisch && t.pOn)) tutStep++;
-                } else if (tutStep === 3) {
-                    title.innerText = "TUTORIAL: STEP 4/13";
-                    msg.innerHTML = "Set the pump speed slider to around <span class='tut-hl'>30%</span> to safely build up initial pressure before opening the line.";
-                    if (SimEngine.tanks.some(t => t.pSpd >= 25 && t.pOn)) tutStep++;
-                } else if (tutStep === 4) {
-                    title.innerText = "TUTORIAL: STEP 5/13";
-                    msg.innerHTML = "Open the <span class='tut-hl'>COLL</span> (Collector) valve to release the cargo into the main collector line.";
-                    if (SimEngine.tanks.some(t => t.vColl)) tutStep++;
-                } else if (tutStep === 5) {
-                    title.innerText = "TUTORIAL: STEP 6/13";
-                    msg.innerHTML = "Open the <span class='tut-hl'>COMMON MANIFOLD</span> to start sending cargo to the shore facility.";
-                    if (SimEngine.manifold) tutStep++;
-                } else if (tutStep === 6) {
-                    title.innerText = "TUTORIAL: STEP 7/13";
-                    msg.innerHTML = "Slowly increase the pump speed to <span class='tut-hl'>100%</span>. <br><br><span style='color:red;'>Watch the Manifold Pressure (right panel) carefully! It must not exceed 10.0 BAR!</span>";
-                    if (SimEngine.tanks.some(t => t.pSpd >= 90)) tutStep++;
-                } else if (tutStep === 7) {
-                    title.innerText = "TUTORIAL: STEP 8/13";
-                    msg.innerHTML = "Cargo is leaving the ship and it's getting lighter! We must take on ballast water to keep it stable. Switch to the <span class='tut-hl'>BALLAST SYSTEM</span> tab.";
-                    if (activeTab === 'view-ballast') tutStep++;
-                } else if (tutStep === 8) {
-                    title.innerText = "TUTORIAL: STEP 9/13";
-                    msg.innerHTML = "To start taking ballast, open <span class='tut-hl'>V1 (Sea Chest)</span>, <span class='tut-hl'>V2 (Port Suction)</span>, and at least one <span class='tut-hl'>Port Tank valve</span> (like WB4P) on the right.";
-                    let tOpen = SimEngine.ballastTanks.some(t => t.vOpen && t.isPort);
-                    if (SimEngine.b_v1 && SimEngine.b_v2 && tOpen) tutStep++;
-                } else if (tutStep === 9) {
-                    title.innerText = "TUTORIAL: STEP 10/13";
-                    msg.innerHTML = "Turn on the <span class='tut-hl'>Port Pump (P)</span> and move its slider slightly to the right to start loading ballast water.";
-                    if (SimEngine.bpPortOn && SimEngine.bpPortSpeed > 0) tutStep++;
-                } else if (tutStep === 10) {
-                    title.innerText = "TUTORIAL: STEP 11/13";
-                    msg.innerHTML = "Great! Let's check our structural limits. Open the <span class='tut-hl'>STABILITY & STRESS</span> tab.";
-                    if (activeTab === 'view-stability') tutStep++;
-                } else if (tutStep === 11) {
-                    title.innerText = "TUTORIAL: STEP 12/13";
-                    msg.innerHTML = "Remember the golden rules: <span class='tut-hl'>BM/SF < 100%</span>, <span class='tut-hl'>Trim < 3.0m</span>, and <span class='tut-hl'>List < 1.0°</span>! Exceeding these fails the mission. Switch back to <span class='tut-hl'>OVERVIEW</span>.";
-                    if (activeTab === 'view-overview') tutStep++;
-                } else if (tutStep === 12) {
-                    title.innerText = "TUTORIAL: STEP 13/13";
-                    msg.innerHTML = "You're all set! Click the <span class='tut-hl'>1X SPEED</span> button at the bottom to fast-forward time (10X or 50X). Manage stability and empty the tanks to complete the mission!";
-                }
-            }
-        }
-
-        // --- EKRANI CANLI GÜNCELLEME ---
-        function updateScreen() {
-            if(!SimEngine.isRunning) return; 
-
-            SimEngine.updatePhysics();
-            updateTutorial();
-            
-            let banner = document.getElementById('alarm-banner');
-            if(SimEngine.currentAlarms.length > 0) {
-                banner.style.display = "block";
-                banner.innerText = "🚨 ALARMS: " + SimEngine.currentAlarms.join(" | ");
-            } else {
-                banner.style.display = "none";
-            }
-
-            let maniVal = document.getElementById('mimic-mani-val');
-            if(maniVal) { if(SimEngine.manifold) maniVal.classList.add('on'); else maniVal.classList.remove('on'); }
-
-            let totalRob = 0;
-            SimEngine.tanks.forEach(t => {
-                totalRob += t.vol;
-                let volPct = t.vol / t.cap;
-                let pct = Math.max(0, Math.min(100, volPct * 100));
-                
-                let liq = document.getElementById(`ov-liq-${t.id}`);
-                if(liq) liq.style.height = pct + "%";
-                let vol = document.getElementById(`ov-vol-${t.id}`);
-                if(vol) vol.innerText = `${t.vol.toFixed(3)} m3 (${pct.toFixed(1)}%)`; // 3 HANE KÜSÜRAT EKLENDİ
-                
-                let ullage = 0.00;
-                if (volPct >= 0.978) {
-                    ullage = (1 - volPct) * (t.u978 / 0.022);
-                } else {
-                    ullage = t.u978 + (0.978 - volPct) * ((t.height - t.u978) / 0.978);
-                }
-                if (ullage < 0) ullage = 0;
-
-                let ull = document.getElementById(`ov-ull-${t.id}`);
-                if(ull) ull.innerText = `ULL: ${ullage.toFixed(2)} m`;
-                let rate = document.getElementById(`ov-rate-${t.id}`);
-                if(rate) rate.innerText = `Rate: ${Math.floor(Math.abs(t.rate))} m3/h`;
-                let press = document.getElementById(`ov-press-${t.id}`);
-                if(press) press.innerText = `${Math.floor(t.press)} mbar`;
-
-                let pv = document.getElementById(`ov-pv-${t.id}`);
-                if(pv) {
-                    pv.innerText = `PV: ${t.pv}`;
-                    pv.style.color = t.pv === "CLOSED" ? "gray" : "#FFA500";
-                }
-
-                let frame = document.getElementById(`frame-${t.id}`);
-                if(frame) {
-                    frame.classList.remove('alarm-hl', 'alarm-hhl', 'alarm-overfill');
-                    if(t.overfill) frame.classList.add('alarm-overfill');
-                    else if(t.hhl) frame.classList.add('alarm-hhl');
-                    else if(t.hl) frame.classList.add('alarm-hl');
-                }
-
-                let mVDrop = document.getElementById(`mimic-vDrop-${t.id}`);
-                if(mVDrop) { if(t.vDrop) mVDrop.classList.add('on'); else mVDrop.classList.remove('on'); }
-
-                let mVDisch = document.getElementById(`mimic-vDisch-${t.id}`);
-                if(mVDisch) { if(t.vDisch) mVDisch.classList.add('on'); else mVDisch.classList.remove('on'); }
-
-                let mVColl = document.getElementById(`mimic-vColl-${t.id}`);
-                if(mVColl) { if(t.vColl) mVColl.classList.add('on'); else mVColl.classList.remove('on'); }
-
-                let mPOn = document.getElementById(`mimic-pOn-${t.id}`);
-                if(mPOn) { if(t.pOn) mPOn.classList.add('on'); else mPOn.classList.remove('on'); }
-
-                let tvSpd = document.getElementById(`tv-pspd-${t.id}`);
-                if(tvSpd) tvSpd.innerText = `${t.pSpd}%`;
-            });
-
-            SimEngine.ballastTanks.forEach(t => {
-                let pct = Math.max(0, Math.min(100, (t.vol / t.cap) * 100));
-                let liq = document.getElementById(`bl-liq-${t.id}`);
-                if(liq) liq.style.height = pct + "%";
-                let vol = document.getElementById(`bl-vol-${t.id}`);
-                if(vol) vol.innerText = `${t.vol.toFixed(3)} m3 (${pct.toFixed(1)}%)`;
-                let rate = document.getElementById(`bl-rate-${t.id}`);
-                if(rate) rate.innerText = `Rate: ${Math.floor(Math.abs(t.rate))} m3/h`;
-            });
-
-            for(let i=1; i<=8; i++) {
-                let el = document.getElementById('v' + i);
-                if(el) {
-                    if(SimEngine['b_v' + i]) el.classList.add('on');
-                    else el.classList.remove('on');
-                }
-            }
-
-            let elPP = document.getElementById('pP');
-            if(elPP) { if(SimEngine.bpPortOn) elPP.classList.add('on'); else elPP.classList.remove('on'); }
-            
-            let elPS = document.getElementById('pS');
-            if(elPS) { if(SimEngine.bpStbdOn) elPS.classList.add('on'); else elPS.classList.remove('on'); }
-
-            // NEW: ROB Küsuratlı gösterimi (3 Hane)
-            document.getElementById("tv-rob").innerText = `ROB: ${totalRob.toFixed(3)} m3`;
-            document.getElementById("tv-line-press").innerText = `${SimEngine.linePressure.toFixed(1)} BAR`;
-            document.getElementById("tv-mani-press").innerText = `${SimEngine.manifoldPressure.toFixed(1)} BAR`;
-
-            let tvDraftFwd = document.getElementById("tv-draft-fwd");
-            if(tvDraftFwd) tvDraftFwd.innerText = SimEngine.draftFwd.toFixed(2) + " m";
-
-            let tvDraftAft = document.getElementById("tv-draft-aft");
-            if(tvDraftAft) tvDraftAft.innerText = SimEngine.draftAft.toFixed(2) + " m";
-
-            let listText = SimEngine.shipList > 0 ? "STARBOARD" : (SimEngine.shipList < 0 ? "PORT" : "");
-            let trimText = SimEngine.shipTrim > 0 ? "AFT" : (SimEngine.shipTrim < 0 ? "FWD" : "");
-            
-            let listTextFull = `${Math.abs(SimEngine.shipList).toFixed(2)} deg ${listText}`;
-            let trimTextFull = `${Math.abs(SimEngine.shipTrim).toFixed(2)} m ${trimText}`;
-
-            document.getElementById("tv-list").innerText = `LIST: ${listTextFull}`;
-            document.getElementById("tv-trim").innerText = `TRIM: ${trimTextFull}`;
-            
-            let bigValTrim = document.getElementById("big-val-trim");
-            if(bigValTrim) bigValTrim.innerText = trimTextFull;
-            
-            let bigValList = document.getElementById("big-val-list");
-            if(bigValList) bigValList.innerText = listTextFull;
-
-            let bmColor = SimEngine.bmPct > 85 ? "#FF4444" : (SimEngine.bmPct > 60 ? "#FFB300" : "#00FF00");
-            let sfColor = SimEngine.sfPct > 85 ? "#FF4444" : (SimEngine.sfPct > 60 ? "#FFB300" : "#00FF00");
-
-            let tvBm = document.getElementById("tv-bm");
-            if(tvBm) { tvBm.innerText = `BM: ${SimEngine.bmPct.toFixed(1)}% (${SimEngine.bmType})`; tvBm.style.color = bmColor; }
-            let tvSf = document.getElementById("tv-sf");
-            if(tvSf) { tvSf.innerText = `SF: ${SimEngine.sfPct.toFixed(1)}%`; tvSf.style.color = sfColor; }
-
-            let bigValBm = document.getElementById("big-val-bm");
-            if(bigValBm) { bigValBm.innerText = `${SimEngine.bmPct.toFixed(1)}%\n${SimEngine.bmType}`; bigValBm.style.color = bmColor; }
-            let bigValSf = document.getElementById("big-val-sf");
-            if(bigValSf) { bigValSf.innerText = `${SimEngine.sfPct.toFixed(1)}%`; bigValSf.style.color = sfColor; }
-            
-            // Geminin Uçmasını Engelleyen Yeni Görsel Fizik Oranı
-            let meanDraft = (SimEngine.draftFwd + SimEngine.draftAft) / 2;
-            let draftRatio = (meanDraft - 3.0) / 8.5; 
-            if(draftRatio > 1) draftRatio = 1;
-            if(draftRatio < 0) draftRatio = 0;
-            
-            const maxRise = 40; // Maksimum yükselme oranı azaltıldı (gemi tamamen sudan çıkmaz)
-            let currentBottom = 10 + ((1 - draftRatio) * maxRise);
-
-            const listDeg = SimEngine.shipList * 1.5;
-            const trimDeg = -SimEngine.shipTrim * 2;
-
-            const backOffset = 15;
-            const miniBackOffset = 5;
-
-            const iMiniBack = document.getElementById("img-mini-back");
-            const iMiniSide = document.getElementById("img-mini-side");
-            if(iMiniBack) { iMiniBack.style.transform = `rotate(${listDeg}deg)`; iMiniBack.style.bottom = `${(currentBottom/3) - miniBackOffset}px`; }
-            if(iMiniSide) { iMiniSide.style.transform = `rotate(${trimDeg}deg)`; iMiniSide.style.bottom = `${currentBottom/3}px`; }
-
-            const iStabBack = document.getElementById("img-stab-back");
-            const iStabSide = document.getElementById("img-stab-side");
-            
-            if(iStabBack) { iStabBack.style.transform = `rotate(${listDeg}deg)`; iStabBack.style.bottom = `${currentBottom - backOffset}px`; }
-            if(iStabSide) { iStabSide.style.transform = `rotate(${trimDeg}deg)`; iStabSide.style.bottom = `${currentBottom}px`; }
-        }
-
-        // --- ABORT MODAL ---
-        document.getElementById("btn-abort-main").addEventListener("click", () => { document.getElementById("override-modal").style.display = "flex"; });
-        function closeAbortModal() { document.getElementById("override-modal").style.display = "none"; }
-        function executeAbort() { closeAbortModal(); alert("MISSION ABORTED!"); location.reload(); }
-
-        // --- NEW: COMPLETE OPERATION MODAL & DISCREPANCY CHECK ---
-        document.getElementById("btn-complete-main").addEventListener("click", evaluateMissionComplete);
-
-        function evaluateMissionComplete() {
-            if (!SimEngine.isRunning) return;
-            SimEngine.isRunning = false; // Simülasyonu durdur
-            
-            let currentVol = 0;
-            SimEngine.tanks.forEach(t => currentVol += t.vol);
-            
-            let isLoad = (currentMissionId === 2 || currentMissionId === 4 || currentMissionId === 5);
-            let actualChange = isLoad ? (currentVol - SimEngine.initialTotalVolume) : (SimEngine.initialTotalVolume - currentVol);
-            if (actualChange < 0) actualChange = 0;
-
-            let discrepancy = actualChange - SimEngine.targetOperationVolume;
-            let absDiscrepancy = Math.abs(discrepancy);
-            
-            // Binde 3 Kuralı (Tolerance Calculation)
-            let margin = SimEngine.targetOperationVolume * 0.003; 
-            let isSuccess = false;
-
-            // Toleransı sadece Random Görevler (3 ve 4) için işlet, diğerlerinde esnek tut
-            if (currentMissionId === 3 || currentMissionId === 4) {
-                isSuccess = absDiscrepancy <= margin;
-            } else {
-                // Standart görevler için geniş tolerans veriyoruz (opsiyonel)
-                isSuccess = absDiscrepancy <= 50; 
-            }
-
-            document.getElementById("complete-modal").style.display = "flex";
-            let header = document.getElementById("complete-header");
-            let box = document.getElementById("complete-box");
-            
-            if (isSuccess) {
-                header.innerText = "/// OPERATION SUCCESSFUL ///";
-                header.style.backgroundColor = "#00FF00";
-                header.style.color = "black";
-                box.style.borderColor = "#00FF00";
-            } else {
-                header.innerText = "/// MISSION FAILED ///";
-                header.style.backgroundColor = "red";
-                header.style.color = "white";
-                box.style.borderColor = "red";
-            }
-
-            let typeStr = isLoad ? "Loaded" : "Discharged";
-            
-            let msgHTML = `
-                <div style="font-family: monospace; font-size: 16px; line-height: 1.8; text-align: left;">
-                    <span style="color:cyan;">TARGET ${typeStr.toUpperCase()}:</span> ${SimEngine.targetOperationVolume.toFixed(3)} m3<br>
-                    <span style="color:cyan;">ACTUAL ${typeStr.toUpperCase()}:</span> ${actualChange.toFixed(3)} m3<br>
-                    <hr style="border-color:#333;">
-                    <span style="color:yellow;">CURRENT ROB:</span> ${currentVol.toFixed(3)} m3<br>
-                    <hr style="border-color:#333;">
-                    <span style="color:#AAA;">DISCREPANCY:</span> ${(discrepancy > 0 ? "+" : "")}${discrepancy.toFixed(3)} m3<br>
-                    <span style="color:#AAA;">TOLERANCE (0.3%):</span> &plusmn;${margin.toFixed(3)} m3<br>
-                </div>
-                <div style="margin-top:20px; font-size:18px; font-weight:bold;">
-                    RESULT: ${isSuccess ? "<span style='color:#00FF00;'>PASSED ALIGNED WITH TOLERANCE</span>" : "<span style='color:red;'>FAILED DISCREPANCY LIMIT</span>"}
-                </div>
-            `;
-            document.getElementById("complete-msg").innerHTML = msgHTML;
-        }
-
-    </script>
+    <script src="engine.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
